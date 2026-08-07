@@ -1,0 +1,20 @@
+# oculpm:begin v1
+.oculpm/index/
+.oculpm/hooks/
+.oculpm/.lock
+.oculpm/.schema-version
+.oculpm/oculpm.log
+.oculpm.backup-*/
+# oculpm:end
+
+# Node
+node_modules/
+dist/
+
+# Rust / Tauri
+target/
+src-tauri/gen/
+
+# OS
+.DS_Store
+Thumbs.db
