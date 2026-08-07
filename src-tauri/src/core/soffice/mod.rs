@@ -9,3 +9,4 @@ pub mod outcome;
 pub mod probe;
 pub mod profile;
 pub mod runner;
+pub mod version;
