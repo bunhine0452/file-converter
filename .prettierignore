@@ -9,3 +9,6 @@ src-tauri/icons
 
 # 문서는 포맷터 대상에서 제외 (AGENTS.md 등 도구 관리 파일 훼손 방지)
 *.md
+
+# 에이전트 작업용 git worktree
+.claude/worktrees

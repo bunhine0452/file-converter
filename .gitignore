@@ -26,3 +26,6 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 *.log
+
+# 에이전트 작업용 git worktree
+.claude/worktrees/
