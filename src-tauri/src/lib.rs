@@ -3,7 +3,7 @@ pub mod shell;
 
 use tauri::Manager;
 
-use shell::commands::{cancel_job, list_jobs, start_demo_job};
+use shell::commands::{cancel_job, convert_hwp, get_runtime_status, install_runtime, list_jobs};
 use shell::{event_sink::TauriEventSink, AppState};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -13,13 +13,17 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let sink = TauriEventSink::new(app.handle().clone());
-            app.manage(AppState::new(sink));
+            // 런타임은 로컬 데이터 디렉토리에 둔다 (Windows 로밍 프로필 금지).
+            let data_dir = app.path().app_local_data_dir()?;
+            app.manage(AppState::new(sink, &data_dir));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            start_demo_job,
             cancel_job,
-            list_jobs
+            list_jobs,
+            get_runtime_status,
+            install_runtime,
+            convert_hwp
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

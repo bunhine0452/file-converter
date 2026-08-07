@@ -22,11 +22,6 @@ export function subscribeToJobEvents(
   return listen<JobEvent>(JOB_EVENT, (event) => handler(event.payload));
 }
 
-/** 이벤트 브리지 확인용 데모 작업을 시작한다 (Phase 2 에서 실제 변환으로 대체). */
-export function startDemoJob(): Promise<JobId> {
-  return invoke<JobId>("start_demo_job");
-}
-
 export function cancelJob(id: JobId): Promise<void> {
   return invoke("cancel_job", { id });
 }
