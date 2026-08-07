@@ -18,3 +18,11 @@ src-tauri/gen/
 # OS
 .DS_Store
 Thumbs.db
+
+# Vite / editor
+*.local
+dist-ssr
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.log

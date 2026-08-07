@@ -1,0 +1,11 @@
+dist
+coverage
+node_modules
+pnpm-lock.yaml
+src-tauri/target
+src-tauri/gen
+src-tauri/icons
+.oculpm
+
+# 문서는 포맷터 대상에서 제외 (AGENTS.md 등 도구 관리 파일 훼손 방지)
+*.md
