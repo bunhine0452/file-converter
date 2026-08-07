@@ -21,9 +21,9 @@ use crate::core::runtime::installer::{
     bundled_extension_dir, jre_dir_name, resolve_java_home, InstallError, ToolInstaller,
 };
 use crate::core::runtime::plan::{
-    is_stale_lock_error, managed_install_root, parse_unopkg_list, profile_lock_file,
-    resolve_install_plan, unopkg_add_args, unopkg_list_args, ExtensionState, ExtensionStrategy,
-    InstallStep, InstalledLibreOffice, RuntimeStatus,
+    extension_strategy_for, is_stale_lock_error, managed_install_root, parse_unopkg_list,
+    profile_lock_file, resolve_install_plan, unopkg_add_args, unopkg_list_args, ExtensionState,
+    ExtensionStrategy, InstallStep, InstalledLibreOffice, RuntimeStatus,
 };
 use crate::core::soffice::detect::{detect, unopkg_next_to, SofficeInfo};
 use crate::core::soffice::invoke::{timeout_for, ConvertPlan};
@@ -163,6 +163,9 @@ impl RuntimeManager {
     fn probe_status(&self) -> Result<RuntimeStatus, String> {
         let soffice = self.soffice()?;
         let java_home = self.find_java_home();
+        let managed = soffice
+            .as_ref()
+            .is_some_and(|info| self.is_managed(&info.exe));
 
         let extension = match &soffice {
             Some(info) => self.query_extension(&info.exe)?,
@@ -175,7 +178,7 @@ impl RuntimeManager {
         Ok(RuntimeStatus {
             libreoffice: soffice.map(|info| InstalledLibreOffice {
                 version: info.version,
-                managed: info.exe.starts_with(&self.paths.libreoffice),
+                managed,
             }),
             java_home,
             extension,
@@ -187,6 +190,15 @@ impl RuntimeManager {
         resolve_java_home(&self.paths.jre, self.platform.os, self.fs.as_ref())
     }
 
+    /// 앱이 직접 설치한 LibreOffice 인가 — 확장을 어디에 넣고 어디서 찾을지가 여기서 갈린다.
+    fn is_managed(&self, soffice: &Path) -> bool {
+        soffice.starts_with(&self.paths.libreoffice)
+    }
+
+    fn extension_strategy(&self, soffice: &Path) -> ExtensionStrategy {
+        extension_strategy_for(self.is_managed(soffice))
+    }
+
     fn query_extension(&self, soffice: &Path) -> Result<ExtensionState, String> {
         let profile = self.paths.profile_url()?;
         let unopkg = unopkg_next_to(soffice);
@@ -196,7 +208,7 @@ impl RuntimeManager {
 
         let output = self.run_with_profile(crate::core::soffice::runner::ProcessRequest {
             program: unopkg,
-            args: unopkg_list_args(&profile),
+            args: unopkg_list_args(&profile, self.extension_strategy(soffice)),
             env: self.child_env(),
             timeout: UNOPKG_TIMEOUT,
         });
@@ -561,13 +573,117 @@ pub fn jre_folder_name() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::fs_port::fake::FakeFs;
     use crate::core::runtime::assets::{Arch, Os};
+    use crate::core::runtime::download::fake::FakeDownloader;
+    use crate::core::soffice::probe::fake::FakeProbe;
+    use crate::core::soffice::runner::fake::{ok_output, FakeRunner};
 
     fn platform(os: Os) -> Platform {
         Platform {
             os,
             arch: Arch::Aarch64,
         }
+    }
+
+    const VERSION_STDOUT: &str = "LibreOffice 26.2.5.2 f1a2b3c\n";
+
+    /// 상태 조회 경로는 설치기를 부르지 않는다 — 자리만 채운다.
+    struct UnusedInstaller;
+
+    impl ToolInstaller for UnusedInstaller {
+        fn install_libreoffice(&self, _: &Path, _: &Path) -> Result<PathBuf, InstallError> {
+            unreachable!("상태 조회는 설치기를 부르지 않는다")
+        }
+
+        fn install_jre(&self, _: &Path, _: &Path) -> Result<PathBuf, InstallError> {
+            unreachable!("상태 조회는 설치기를 부르지 않는다")
+        }
+
+        fn unpack_oxt(&self, _: &Path, _: &Path) -> Result<(), InstallError> {
+            unreachable!("상태 조회는 설치기를 부르지 않는다")
+        }
+    }
+
+    /// 앱이 설치한 LibreOffice 를 흉내내는 매니저. soffice·unopkg 응답을 미리 심어둔다.
+    ///
+    /// `user_override` 로 후보를 직접 지정해 호스트 OS 와 무관하게 같은 경로를 쓴다.
+    fn managed_manager(unopkg_stdout: &str) -> (RuntimeManager, Arc<FakeRunner>) {
+        let platform = Platform::host().expect("지원 플랫폼");
+        let base = std::env::temp_dir().join("fc-runtime-manager-test");
+        let paths = RuntimePaths::new(&base, platform).expect("런타임 경로");
+
+        let soffice = paths.libreoffice.join("soffice");
+        let unopkg = unopkg_next_to(&soffice);
+
+        let probe = FakeProbe::new()
+            .user_override(soffice.clone())
+            .executable(soffice.clone());
+        let runner = Arc::new(
+            FakeRunner::new()
+                .responding(soffice, ok_output(VERSION_STDOUT))
+                .responding(unopkg.clone(), ok_output(unopkg_stdout)),
+        );
+        let fs = Arc::new(FakeFs::new().with_file(unopkg, b"bin".to_vec()));
+
+        let manager = RuntimeManager::new(
+            Arc::new(probe),
+            runner.clone(),
+            fs,
+            Arc::new(FakeDownloader::new(Vec::new())),
+            Arc::new(UnusedInstaller),
+            paths,
+            platform,
+        );
+
+        (manager, runner)
+    }
+
+    fn unopkg_call_args(runner: &FakeRunner) -> Vec<String> {
+        runner
+            .calls()
+            .iter()
+            .filter(|call| call.args.first().is_some_and(|arg| arg == "list"))
+            .flat_map(|call| call.args.iter().map(|a| a.to_string_lossy().into_owned()))
+            .collect()
+    }
+
+    // ── 확장 조회 스코프 ──────────────────────────────────────────
+
+    #[test]
+    fn 앱이_설치한_libreoffice_의_확장은_번들_스코프로_조회한다() {
+        // 번들 디렉토리에 넣은 확장은 `unopkg list` 에 나오지 않는다 —
+        // 스코프를 안 맞추면 설치가 끝나도 "등록되지 않았습니다" 로 영영 실패한다.
+        let (manager, runner) = managed_manager("All bundled extensions:\n<none>\n");
+
+        manager.status(true).expect("상태 조회");
+
+        assert!(
+            unopkg_call_args(&runner).iter().any(|a| a == "--bundled"),
+            "번들 스코프로 조회하지 않았다: {:?}",
+            unopkg_call_args(&runner)
+        );
+    }
+
+    #[test]
+    fn 번들_확장이_등록돼_있으면_상태가_registered_다() {
+        let listing = "All bundled extensions:\n\n\
+             Identifier: ebandal.libreoffice.H2Orestart\n  \
+             Version: 0.7.13\n  \
+             is registered: yes\n  \
+             bundled Packages: {\n      \
+             URL: .../H2Orestart.jar\n      \
+             is registered: yes\n  }\n";
+        let (manager, _) = managed_manager(listing);
+
+        let status = manager.status(true).expect("상태 조회");
+
+        assert_eq!(
+            status.extension,
+            ExtensionState::Registered {
+                version: "0.7.13".to_string()
+            }
+        );
     }
 
     // ── happy path ───────────────────────────────────────────────

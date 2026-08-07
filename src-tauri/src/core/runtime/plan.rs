@@ -117,20 +117,37 @@ fn extension_needs_install(state: &ExtensionState) -> bool {
 
 /// LibreOffice 가 아직 없으면 우리가 설치할 것이므로 번들 전략이 된다.
 fn extension_strategy(status: &RuntimeStatus) -> ExtensionStrategy {
-    match &status.libreoffice {
-        Some(installed) if !installed.managed => ExtensionStrategy::UserProfile,
-        _ => ExtensionStrategy::BundledDir,
+    let managed = status
+        .libreoffice
+        .as_ref()
+        .map(|installed| installed.managed)
+        .unwrap_or(true);
+
+    extension_strategy_for(managed)
+}
+
+/// 확장을 어디에 넣고 어디서 찾을지는 같은 질문이다 — 설치와 조회가 갈라지지 않게 한 곳에서 정한다.
+pub fn extension_strategy_for(managed: bool) -> ExtensionStrategy {
+    if managed {
+        ExtensionStrategy::BundledDir
+    } else {
+        ExtensionStrategy::UserProfile
     }
 }
 
 /// `unopkg list` 출력에서 우리 확장의 등록 상태만 뽑는다.
+///
+/// 한 확장 블록에는 `is registered:` 가 여러 번 나온다 — 첫 줄이 확장 자체이고,
+/// `bundled Packages` 안의 나머지는 하위 패키지다. **하나라도 미등록이면 준비된 것이 아니다**:
+/// 확장 자체가 `yes` 여도 `H2Orestart.jar` 이 꺼져 있으면 HWP 필터는 동작하지 않는다.
 pub fn parse_unopkg_list(stdout: &str) -> ExtensionState {
     // 출력을 "이해했는가" 와 "우리 확장이 있는가" 는 다른 질문이다.
     // 확장이 하나도 없다는 사실을 읽어낸 것과, 명령이 실패해 아무것도 모르는 것을 구분한다.
     let mut understood = stdout.contains("<none>");
     let mut current_identifier: Option<&str> = None;
     let mut current_version: Option<String> = None;
-    let mut ours: Option<(bool, Option<String>)> = None;
+    let mut own: Option<(bool, Option<String>)> = None;
+    let mut children_registered = true;
 
     for line in stdout.lines() {
         let line = line.trim();
@@ -142,18 +159,24 @@ pub fn parse_unopkg_list(stdout: &str) -> ExtensionState {
         } else if let Some(version) = line.strip_prefix("Version:") {
             current_version = Some(version.trim().to_string());
         } else if let Some(registered) = line.strip_prefix("is registered:") {
-            if current_identifier == Some(H2O_IDENTIFIER) {
-                let is_registered = registered.trim().eq_ignore_ascii_case("yes");
-                ours = Some((is_registered, current_version.clone()));
+            if current_identifier != Some(H2O_IDENTIFIER) {
+                continue;
+            }
+
+            // `unknown` 은 설치가 중간에 깨진 상태다 — 등록으로 볼 수 없다.
+            let is_registered = registered.trim().eq_ignore_ascii_case("yes");
+            match own {
+                None => own = Some((is_registered, current_version.clone())),
+                Some(_) => children_registered = children_registered && is_registered,
             }
         }
     }
 
-    match ours {
-        Some((true, version)) => ExtensionState::Registered {
+    match own {
+        Some((true, version)) if children_registered => ExtensionState::Registered {
             version: version.unwrap_or_default(),
         },
-        Some((false, _)) => ExtensionState::NotRegistered,
+        Some(_) => ExtensionState::NotRegistered,
         None if understood => ExtensionState::NotRegistered,
         None => ExtensionState::Unknown,
     }
@@ -183,8 +206,17 @@ pub fn profile_lock_file(profile_dir: &Path) -> PathBuf {
     profile_dir.join(".lock")
 }
 
-pub fn unopkg_list_args(profile: &ProfileUrl) -> Vec<OsString> {
-    vec![OsString::from("list"), profile.as_arg()]
+/// `unopkg list` argv. **스코프를 설치 전략과 맞춰야 한다** — 옵션 없는 `list` 는
+/// 사용자 확장만 나열하므로 번들 디렉토리에 넣은 확장은 영영 보이지 않는다.
+pub fn unopkg_list_args(profile: &ProfileUrl, strategy: ExtensionStrategy) -> Vec<OsString> {
+    match strategy {
+        ExtensionStrategy::BundledDir => vec![
+            OsString::from("list"),
+            OsString::from("--bundled"),
+            profile.as_arg(),
+        ],
+        ExtensionStrategy::UserProfile => vec![OsString::from("list"), profile.as_arg()],
+    }
 }
 
 /// 런타임을 풀어 놓을 디렉토리. Windows 로밍 프로필은 거부한다 —
@@ -508,7 +540,7 @@ mod tests {
 
     #[test]
     fn unopkg_list_argv_는_프로필을_붙인다() {
-        let args = unopkg_list_args(&profile());
+        let args = unopkg_list_args(&profile(), ExtensionStrategy::UserProfile);
 
         let rendered: Vec<String> = args
             .iter()
@@ -519,6 +551,130 @@ mod tests {
             .iter()
             .any(|a| a == "-env:UserInstallation=file:///tmp/fc-profile"));
         assert!(!rendered.iter().any(|a| a == "--shared"));
+    }
+
+    #[test]
+    fn 번들_디렉토리에_넣은_확장은_번들_스코프로_조회한다() {
+        // `unopkg list` 는 사용자 확장만 나열한다 — 번들 확장은 `--bundled` 없이는
+        // 영영 보이지 않아 설치가 성공해도 검증이 실패하고 매번 다시 설치한다.
+        let args = unopkg_list_args(&profile(), ExtensionStrategy::BundledDir);
+
+        let rendered: Vec<String> = args
+            .iter()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(rendered[0], "list");
+        assert!(rendered.iter().any(|a| a == "--bundled"), "{rendered:?}");
+    }
+
+    #[test]
+    fn 사용자_프로필_확장은_번들_스코프로_조회하지_않는다() {
+        let args = unopkg_list_args(&profile(), ExtensionStrategy::UserProfile);
+
+        assert!(!args.iter().any(|a| a == "--bundled"));
+    }
+
+    #[test]
+    fn 하위_패키지가_하나라도_미등록이면_등록으로_보지_않는다() {
+        // 실제 출력 형태: 확장 자체는 yes 인데 Java 컴포넌트만 활성화에 실패한 상태.
+        // 이때 HWP 필터는 동작하지 않으므로 준비됨으로 보고하면 안 된다.
+        let stdout = "Identifier: ebandal.libreoffice.H2Orestart\n  \
+             Version: 0.7.13\n  \
+             URL: vnd.sun.star.expand:$BUNDLED_EXTENSIONS/H2Orestart\n  \
+             is registered: yes\n  \
+             bundled Packages: {\n      \
+             URL: .../types.rdb\n      \
+             is registered: yes\n\n      \
+             URL: .../H2Orestart.jar\n      \
+             is registered: no\n\n      \
+             URL: .../registry/TypeDetection.xcu\n      \
+             is registered: yes\n  }\n";
+
+        assert_eq!(parse_unopkg_list(stdout), ExtensionState::NotRegistered);
+    }
+
+    #[test]
+    fn 하위_패키지가_모두_등록되면_확장도_등록이다() {
+        let stdout = "Identifier: ebandal.libreoffice.H2Orestart\n  \
+             Version: 0.7.13\n  \
+             is registered: yes\n  \
+             bundled Packages: {\n      \
+             URL: .../H2Orestart.jar\n      \
+             is registered: yes\n\n      \
+             URL: .../registry/TypeDetection.xcu\n      \
+             is registered: yes\n  }\n";
+
+        assert_eq!(
+            parse_unopkg_list(stdout),
+            ExtensionState::Registered {
+                version: "0.7.13".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn 등록_여부가_unknown_이면_등록으로_보지_않는다() {
+        // 설치가 중간에 깨지면 unopkg 가 확장 상태를 unknown 으로 보고한다.
+        let stdout = "Identifier: ebandal.libreoffice.H2Orestart\n  \
+             Version: 0.7.13\n  \
+             is registered: unknown\n";
+
+        assert_eq!(parse_unopkg_list(stdout), ExtensionState::NotRegistered);
+    }
+
+    /// macOS LibreOffice 26.2.5.2 + H2Orestart 0.7.13 에서 그대로 캡처한 출력.
+    /// 설명문에 URL·한글이 섞여 있어도 파서가 흔들리지 않아야 한다.
+    const REAL_BUNDLED_LIST: &str = "All bundled extensions:\n\n\
+         Identifier: ebandal.libreoffice.H2Orestart\n  \
+         Version: 0.7.13\n  \
+         URL: vnd.sun.star.expand:$BUNDLED_EXTENSIONS/H2Orestart\n  \
+         is registered: yes\n  \
+         Media-Type: application/vnd.sun.star.package-bundle\n  \
+         Description: LibreOffice HWP 5.0 import Extension.\n\
+         This product was developed by referring to the ᄒᆞᆫ글 document file (HWP, HWPML) \
+         published by 한글과컴퓨터.\n\
+         Please report bugs to https://github.com/ebandal/H2Orestart\n  \
+         bundled Packages: {\n      \
+         URL: vnd.sun.star.expand:$BUNDLED_EXTENSIONS/H2Orestart/types.rdb\n      \
+         is registered: yes\n      \
+         Media-Type: application/vnd.sun.star.uno-typelibrary;type=RDB\n      \
+         Description: \n\n      \
+         URL: vnd.sun.star.expand:$BUNDLED_EXTENSIONS/H2Orestart/H2Orestart.jar\n      \
+         is registered: yes\n      \
+         Media-Type: application/vnd.sun.star.uno-component;type=Java\n      \
+         Description: \n\n      \
+         URL: vnd.sun.star.expand:$BUNDLED_EXTENSIONS/H2Orestart/registry/TypeDetection.xcu\n      \
+         is registered: yes\n      \
+         Media-Type: application/vnd.sun.star.configuration-data\n      \
+         Description: \n\n  }\n";
+
+    #[test]
+    fn 실제_번들_목록_출력을_등록으로_읽는다() {
+        assert_eq!(
+            parse_unopkg_list(REAL_BUNDLED_LIST),
+            ExtensionState::Registered {
+                version: "0.7.13".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn 뒤에_오는_다른_확장의_하위_패키지는_우리_판정에_섞이지_않는다() {
+        let stdout = "Identifier: ebandal.libreoffice.H2Orestart\n  \
+             Version: 0.7.13\n  \
+             is registered: yes\n\n\
+             Identifier: org.other.Extension\n  \
+             Version: 9.9.9\n  \
+             is registered: no\n  \
+             bundled Packages: {\n      \
+             is registered: no\n  }\n";
+
+        assert_eq!(
+            parse_unopkg_list(stdout),
+            ExtensionState::Registered {
+                version: "0.7.13".to_string()
+            }
+        );
     }
 
     #[test]

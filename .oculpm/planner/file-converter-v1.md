@@ -29,15 +29,15 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
   - [x] Rust→프론트 진행률 이벤트 브리지가 데모 카운터로 동작한다 {#core-events}
 
 ## Phase 2 — 첫 데모: HWP/HWPX → PDF 드래그&드롭 {#ph2-hwp-demo}
-- [~] LibreOffice 런타임 매니저 (감지 + 온디맨드 다운로드) {#lo-runtime}
+- [x] LibreOffice 런타임 매니저 (감지 + 온디맨드 다운로드) {#lo-runtime}
   - [x] mac/win 표준 경로·PATH에서 soffice 탐지가 단위 테스트로 검증된다 {#lo-detect}
-  - [~] 미설치 시 LibreOffice 26.2.x를 앱 데이터 디렉토리에 다운로드·해시 검증·설치한다 {#lo-download}
-  - [~] H2Orestart 0.7.13 확장을 unopkg/프로필로 자동 설치하고 설치 여부를 검증한다 {#lo-h2o}
+  - [x] 미설치 시 LibreOffice 26.2.x를 앱 데이터 디렉토리에 다운로드·해시 검증·설치한다 {#lo-download}
+  - [x] H2Orestart 0.7.13 확장을 unopkg/프로필로 자동 설치하고 설치 여부를 검증한다 {#lo-h2o}
   - [x] 설정 화면에 LibreOffice 상태(감지됨/다운로드 필요/버전)가 표시된다 {#lo-status-ui}
 - [~] HWP 변환 파이프라인 {#hwp-pipeline}
   - [x] soffice headless 호출 래퍼(임시 프로필·타임아웃·에러 매핑)가 단위 테스트로 검증된다 {#hwp-wrapper}
-  - [ ] .hwp 드래그&드롭 → PDF 저장 happy-path가 실제 샘플 파일로 동작한다 (첫 데모) {#hwp-happy}
-  - [ ] .hwpx 동일 경로가 실제 샘플 파일로 동작한다 {#hwpx-happy}
+  - [~] .hwp 드래그&드롭 → PDF 저장 happy-path가 실제 샘플 파일로 동작한다 (첫 데모) {#hwp-happy}
+  - [~] .hwpx 동일 경로가 실제 샘플 파일로 동작한다 {#hwpx-happy}
   - [~] 암호 문서·배포용 문서·손상 파일이 사용자 친화 에러 메시지로 처리된다 {#hwp-errors}
   - [ ] 100MB급 대용량 HWP가 UI 멈춤 없이 변환된다 (진행 표시 유지) {#hwp-large}
 - [~] 데모 UX: 드롭존·진행률·완료 흐름 {#demo-ux}
@@ -127,4 +127,8 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
 | 2026-08-07T18:32:35+09:00 | #lo-status-ui | claude-code | ☐→x | .oculpm/journal/20260807/Features_to_add/1832_feature_phase2-runtime-install-and-ui.md | RuntimeStatus 컴포넌트 — 준비 상태·버전·설치 버튼·진행 막대, 조회 실패도 표시 |
 | 2026-08-07T18:32:44+09:00 | #progress-ui | claude-code | ☐→x | .oculpm/journal/20260807/Features_to_add/1832_feature_phase2-runtime-install-and-ui.md | ConversionQueue — 파일별 상태·진행률·실패 사유 실시간 표시 (이벤트 유실 방어 포함) |
 | 2026-08-07T18:32:52+09:00 | #output-open | claude-code | ☐→~ | .oculpm/journal/20260807/Features_to_add/1832_feature_phase2-runtime-install-and-ui.md | revealItemInDir 로 저장 위치 열기 구현. mac/win 실기 확인 남음 |
+| 2026-08-07T19:29:14+09:00 | #lo-h2o | claude-code | ~→x | .oculpm/journal/20260807/Bugs/1929_bug_h2orestart-verify-scope-mismatch.md | 번들 스코프 조회로 검증 성립 — 실환경 Registered 0.7.13 |
+| 2026-08-07T19:29:21+09:00 | #lo-download | claude-code | ~→x | .oculpm/journal/20260807/Bugs/1929_bug_h2orestart-verify-scope-mismatch.md | 실환경 설치 완주·멱등 확인 (dmg 297MB + JRE 48MB) |
+| 2026-08-07T19:29:28+09:00 | #hwp-happy | claude-code | ☐→~ | .oculpm/journal/20260807/Bugs/1929_bug_h2orestart-verify-scope-mismatch.md | 실물 .hwp→PDF 7쪽 성공(육안 대조 OK) — 앱 창 드래그&드롭만 남음 |
+| 2026-08-07T19:29:34+09:00 | #hwpx-happy | claude-code | ☐→~ | .oculpm/journal/20260807/Bugs/1929_bug_h2orestart-verify-scope-mismatch.md | 실물 .hwpx→PDF 27쪽 성공 — 앱 창 드래그&드롭만 남음 |
 <!-- oculpm:plan-log end -->
