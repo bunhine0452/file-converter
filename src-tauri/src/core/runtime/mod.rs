@@ -5,4 +5,6 @@
 
 pub mod assets;
 pub mod download;
+pub mod installer;
 pub mod plan;
+pub mod real_installer;

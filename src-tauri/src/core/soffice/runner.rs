@@ -124,10 +124,13 @@ pub mod fake {
     use std::collections::BTreeMap;
     use std::sync::Mutex;
 
+    type Effect = Box<dyn Fn() + Send + Sync>;
+
     #[derive(Default)]
     pub struct FakeRunner {
         responses: Mutex<BTreeMap<PathBuf, ProcessOutput>>,
         default_response: Mutex<Option<ProcessOutput>>,
+        effects: Mutex<BTreeMap<PathBuf, Effect>>,
         calls: Mutex<Vec<ProcessRequest>>,
     }
 
@@ -151,6 +154,19 @@ pub mod fake {
             self
         }
 
+        /// 이 프로그램이 실행되면 부작용을 일으킨다 — 실제 도구가 파일을 만드는 것을 흉내낸다.
+        pub fn on_run(
+            self,
+            program: impl Into<PathBuf>,
+            effect: impl Fn() + Send + Sync + 'static,
+        ) -> Self {
+            self.effects
+                .lock()
+                .unwrap()
+                .insert(program.into(), Box::new(effect));
+            self
+        }
+
         pub fn calls(&self) -> Vec<ProcessRequest> {
             self.calls.lock().unwrap().clone()
         }
@@ -163,6 +179,10 @@ pub mod fake {
     impl ProcessRunner for FakeRunner {
         fn run(&self, request: &ProcessRequest) -> Result<ProcessOutput, RunError> {
             self.calls.lock().unwrap().push(request.clone());
+
+            if let Some(effect) = self.effects.lock().unwrap().get(&request.program) {
+                effect();
+            }
 
             if let Some(output) = self.responses.lock().unwrap().get(&request.program) {
                 return Ok(output.clone());

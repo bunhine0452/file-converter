@@ -96,6 +96,18 @@ pub mod fake {
             self.dirs.lock().unwrap().insert(path.into());
             self
         }
+
+        /// 외부 도구가 만들어낸 결과를 흉내낼 때 쓴다 (빌더가 아니라 실행 중 호출).
+        pub fn add_file(&self, path: impl Into<PathBuf>, contents: impl Into<Vec<u8>>) {
+            self.files
+                .lock()
+                .unwrap()
+                .insert(path.into(), contents.into());
+        }
+
+        pub fn add_dir(&self, path: impl Into<PathBuf>) {
+            self.dirs.lock().unwrap().insert(path.into());
+        }
     }
 
     impl FileSystem for FakeFs {
