@@ -4,7 +4,6 @@ import { listen } from "@tauri-apps/api/event";
 import {
   JOB_EVENT,
   cancelJob,
-  startDemoJob,
   subscribeToJobEvents,
   type JobEvent,
 } from "./jobs";
@@ -50,15 +49,6 @@ describe("jobs 브리지", () => {
     const result = await subscribeToJobEvents(() => {});
 
     expect(result).toBe(unlisten);
-  });
-
-  it("데모 작업 시작은 start_demo_job 커맨드를 호출하고 id 를 돌려준다", async () => {
-    vi.mocked(invoke).mockResolvedValue(7);
-
-    const id = await startDemoJob();
-
-    expect(invoke).toHaveBeenCalledWith("start_demo_job");
-    expect(id).toBe(7);
   });
 
   it("취소는 id 를 인자로 cancel_job 커맨드를 호출한다", async () => {

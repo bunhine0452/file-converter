@@ -5,7 +5,7 @@
 //! **빈 PDF** 를 받는다. 이 모듈은 그 실패를 변환 이전 단계에서 명시적 거부로 바꾼다.
 
 /// FileHeader 스트림에서 우리가 해석하는 최소 길이 (바이트).
-const HEADER_MIN_LEN: usize = 48;
+pub const HEADER_MIN_LEN: usize = 48;
 /// 시그니처 필드 길이 (바이트).
 const SIGNATURE_LEN: usize = 32;
 /// HWP5 시그니처 — 32바이트 필드를 공백·NUL 로 다듬은 값.
