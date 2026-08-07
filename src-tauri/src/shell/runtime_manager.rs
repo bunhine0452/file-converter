@@ -13,12 +13,17 @@ use crate::core::fs_port::FileSystem;
 use crate::core::hwp::inspect::preflight_file;
 use crate::core::hwp::message::reject_message;
 use crate::core::hwp::preflight::Preflight;
-use crate::core::runtime::assets::{h2orestart_asset, Platform};
+use crate::core::runtime::assets::{
+    asset_file_name, h2orestart_asset, jre_asset, libreoffice_asset, AssetSpec, Platform,
+};
 use crate::core::runtime::download::{DownloadProgress, Downloader, ProgressThrottle};
-use crate::core::runtime::installer::{jre_dir_name, InstallError, ToolInstaller};
+use crate::core::runtime::installer::{
+    bundled_extension_dir, jre_dir_name, resolve_java_home, InstallError, ToolInstaller,
+};
 use crate::core::runtime::plan::{
-    managed_install_root, parse_unopkg_list, resolve_install_plan, unopkg_add_args,
-    unopkg_list_args, ExtensionState, InstallStep, InstalledLibreOffice, RuntimeStatus,
+    is_stale_lock_error, managed_install_root, parse_unopkg_list, profile_lock_file,
+    resolve_install_plan, unopkg_add_args, unopkg_list_args, ExtensionState, ExtensionStrategy,
+    InstallStep, InstalledLibreOffice, RuntimeStatus,
 };
 use crate::core::soffice::detect::{detect, unopkg_next_to, SofficeInfo};
 use crate::core::soffice::invoke::{timeout_for, ConvertPlan};
@@ -179,9 +184,7 @@ impl RuntimeManager {
     }
 
     fn find_java_home(&self) -> Option<PathBuf> {
-        crate::core::runtime::installer::java_home_candidates(&self.paths.jre, self.platform.os)
-            .into_iter()
-            .find(|candidate| self.fs.is_dir(candidate))
+        resolve_java_home(&self.paths.jre, self.platform.os, self.fs.as_ref())
     }
 
     fn query_extension(&self, soffice: &Path) -> Result<ExtensionState, String> {
@@ -191,15 +194,12 @@ impl RuntimeManager {
             return Ok(ExtensionState::Unknown);
         }
 
-        let _guard = self.lock_profile();
-        let output = self
-            .runner
-            .run(&crate::core::soffice::runner::ProcessRequest {
-                program: unopkg,
-                args: unopkg_list_args(&profile),
-                env: self.child_env(),
-                timeout: UNOPKG_TIMEOUT,
-            });
+        let output = self.run_with_profile(crate::core::soffice::runner::ProcessRequest {
+            program: unopkg,
+            args: unopkg_list_args(&profile),
+            env: self.child_env(),
+            timeout: UNOPKG_TIMEOUT,
+        });
 
         match output {
             Ok(output) => Ok(parse_unopkg_list(&output.stdout)),
@@ -216,6 +216,27 @@ impl RuntimeManager {
             )],
             None => Vec::new(),
         }
+    }
+
+    /// 프로필을 쓰는 실행. 남은 잠금 파일 때문에 시작조차 못 하면 한 번 치우고 재시도한다.
+    fn run_with_profile(
+        &self,
+        request: crate::core::soffice::runner::ProcessRequest,
+    ) -> Result<crate::core::soffice::runner::ProcessOutput, String> {
+        let _guard = self.lock_profile();
+
+        let first = self
+            .runner
+            .run(&request)
+            .map_err(|error| error.to_string())?;
+        if !is_stale_lock_error(&first.stderr) {
+            return Ok(first);
+        }
+
+        // 비정상 종료로 남은 찌꺼기다 — 전용 프로필이라 다른 인스턴스일 리 없다.
+        let _ = self.fs.remove_file(&profile_lock_file(&self.paths.profile));
+
+        self.runner.run(&request).map_err(|error| error.to_string())
     }
 
     fn lock_profile(&self) -> std::sync::MutexGuard<'_, ()> {
@@ -264,25 +285,32 @@ impl RuntimeManager {
     ) -> Result<(), String> {
         match step {
             InstallStep::DownloadLibreOffice(spec) => {
-                self.download(spec, "libreoffice", label, on_event, is_cancelled)
+                self.download(spec, label, on_event, is_cancelled)
             }
-            InstallStep::DownloadJre(spec) => {
-                self.download(spec, "jre", label, on_event, is_cancelled)
-            }
+            InstallStep::DownloadJre(spec) => self.download(spec, label, on_event, is_cancelled),
             InstallStep::DownloadExtension(spec) => {
-                self.download(spec, "H2Orestart.oxt", label, on_event, is_cancelled)
+                self.download(spec, label, on_event, is_cancelled)
             }
             InstallStep::InstallLibreOffice => self
                 .installer
-                .install_libreoffice(&self.archive_path("libreoffice"), &self.paths.libreoffice)
+                .install_libreoffice(
+                    &self.archive_path(&libreoffice_asset(self.platform)),
+                    &self.paths.libreoffice,
+                )
                 .map(|_| ())
                 .map_err(stringify),
             InstallStep::InstallJre => self
                 .installer
-                .install_jre(&self.archive_path("jre"), &self.paths.jre)
+                .install_jre(
+                    &self.archive_path(&jre_asset(self.platform)),
+                    &self.paths.jre,
+                )
                 .map(|_| ())
                 .map_err(stringify),
-            InstallStep::InstallExtension(_) => self.install_extension(),
+            InstallStep::InstallExtension(strategy) => match strategy {
+                ExtensionStrategy::BundledDir => self.install_extension_bundled(),
+                ExtensionStrategy::UserProfile => self.install_extension_via_unopkg(),
+            },
             InstallStep::ResetProfile => {
                 let _ = self.fs.remove_dir_all(&self.paths.profile);
                 Ok(())
@@ -291,14 +319,15 @@ impl RuntimeManager {
         }
     }
 
-    fn archive_path(&self, name: &str) -> PathBuf {
-        self.paths.downloads.join(name)
+    /// 내려받은 파일은 **URL 의 파일명 그대로** 저장한다 — 확장자를 잃으면
+    /// `.tar.gz` 를 zip 으로 풀려다 실패한다 (실제로 여기서 설치가 깨졌다).
+    fn archive_path(&self, spec: &AssetSpec) -> PathBuf {
+        self.paths.downloads.join(asset_file_name(spec))
     }
 
     fn download(
         &self,
-        spec: &crate::core::runtime::assets::AssetSpec,
-        name: &str,
+        spec: &AssetSpec,
         label: &str,
         on_event: &mut dyn FnMut(InstallEvent),
         is_cancelled: &dyn Fn() -> bool,
@@ -307,7 +336,7 @@ impl RuntimeManager {
             .create_dir_all(&self.paths.downloads)
             .map_err(|e| e.to_string())?;
 
-        let dest = self.archive_path(name);
+        let dest = self.archive_path(spec);
         let started = Instant::now();
         let mut throttle = ProgressThrottle::new();
         let step = label.to_string();
@@ -332,24 +361,62 @@ impl RuntimeManager {
             .map_err(|error| error.to_string())
     }
 
-    fn install_extension(&self) -> Result<(), String> {
+    /// 앱이 설치한 LibreOffice 에는 번들 확장 디렉토리에 직접 풀고 한 번 기동해 등록시킨다.
+    ///
+    /// macOS 에서 `unopkg add` 는 UNO 파이프에 붙지 못해
+    /// `NoConnectException` 으로 실패한다 — 이 경로가 사실상 유일한 방법이다.
+    fn install_extension_bundled(&self) -> Result<(), String> {
+        let soffice = self
+            .soffice()?
+            .ok_or_else(|| "LibreOffice 를 찾지 못했습니다".to_string())?;
+        let target = bundled_extension_dir(&soffice.exe, self.platform.os)
+            .ok_or_else(|| "확장을 넣을 위치를 찾지 못했습니다".to_string())?;
+
+        // 이전 버전이 남아 있으면 섞인다.
+        let _ = self.fs.remove_dir_all(&target);
+        self.installer
+            .unpack_oxt(&self.archive_path(&h2orestart_asset()), &target)
+            .map_err(stringify)?;
+
+        // 번들 확장은 기동할 때 스캔돼 사용자 프로필에 등록된다.
+        self.warm_up_profile(&soffice.exe)
+    }
+
+    /// 확장 등록을 트리거하기 위한 1회 기동.
+    fn warm_up_profile(&self, soffice: &Path) -> Result<(), String> {
+        let profile = self.paths.profile_url()?;
+
+        self.run_with_profile(crate::core::soffice::runner::ProcessRequest {
+            program: soffice.to_path_buf(),
+            args: vec![
+                profile.as_arg(),
+                std::ffi::OsString::from("--headless"),
+                std::ffi::OsString::from("--terminate_after_init"),
+            ],
+            env: self.child_env(),
+            timeout: UNOPKG_TIMEOUT,
+        })?;
+
+        // 기동이 비정상 종료하면 잠금이 남아 다음 호출을 막는다.
+        let _ = self.fs.remove_file(&profile_lock_file(&self.paths.profile));
+
+        Ok(())
+    }
+
+    fn install_extension_via_unopkg(&self) -> Result<(), String> {
         let soffice = self
             .soffice()?
             .ok_or_else(|| "LibreOffice 를 찾지 못했습니다".to_string())?;
         let profile = self.paths.profile_url()?;
         let unopkg = unopkg_next_to(&soffice.exe);
-        let oxt = self.archive_path("H2Orestart.oxt");
+        let oxt = self.archive_path(&h2orestart_asset());
 
-        let _guard = self.lock_profile();
-        let output = self
-            .runner
-            .run(&crate::core::soffice::runner::ProcessRequest {
-                program: unopkg,
-                args: unopkg_add_args(&oxt, &profile),
-                env: self.child_env(),
-                timeout: UNOPKG_TIMEOUT,
-            })
-            .map_err(|error| error.to_string())?;
+        let output = self.run_with_profile(crate::core::soffice::runner::ProcessRequest {
+            program: unopkg,
+            args: unopkg_add_args(&oxt, &profile),
+            env: self.child_env(),
+            timeout: UNOPKG_TIMEOUT,
+        })?;
 
         match output.termination {
             Termination::Code(0) => Ok(()),
@@ -399,12 +466,8 @@ impl RuntimeManager {
         let timeout = timeout_for(self.fs.len(input).unwrap_or(0));
 
         let outcome = {
-            let _guard = self.lock_profile();
             let request = plan.request(&soffice.exe, java_home.as_deref(), timeout);
-            let output = self
-                .runner
-                .run(&request)
-                .map_err(|error| error.to_string())?;
+            let output = self.run_with_profile(request)?;
 
             let produced = plan.expected_output();
             judge(&JudgeInput {

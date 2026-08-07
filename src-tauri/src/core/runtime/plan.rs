@@ -170,6 +170,19 @@ pub fn unopkg_add_args(oxt: &Path, profile: &ProfileUrl) -> Vec<OsString> {
     ]
 }
 
+/// 프로필에 남은 잠금 파일 때문에 unopkg 가 시작조차 못 한 경우인가.
+///
+/// 비정상 종료(강제 종료·크래시)로 `.lock` 이 남으면 이후 모든 호출이 막힌다.
+/// 우리는 전용 프로필을 쓰므로 이 잠금은 항상 우리가 남긴 찌꺼기다.
+pub fn is_stale_lock_error(stderr: &str) -> bool {
+    stderr.contains("The lock file indicates it is already running")
+}
+
+/// 지울 잠금 파일 경로.
+pub fn profile_lock_file(profile_dir: &Path) -> PathBuf {
+    profile_dir.join(".lock")
+}
+
 pub fn unopkg_list_args(profile: &ProfileUrl) -> Vec<OsString> {
     vec![OsString::from("list"), profile.as_arg()]
 }
@@ -506,6 +519,31 @@ mod tests {
             .iter()
             .any(|a| a == "-env:UserInstallation=file:///tmp/fc-profile"));
         assert!(!rendered.iter().any(|a| a == "--shared"));
+    }
+
+    #[test]
+    fn 잠금_파일_때문에_시작하지_못한_경우를_알아본다() {
+        let stderr = "ERROR: unopkg cannot be started. The lock file indicates it is already \
+             running. If this does not apply, delete the lock file at:\n/tmp/profile/.lock";
+
+        assert!(is_stale_lock_error(stderr));
+    }
+
+    #[test]
+    fn 다른_실패는_잠금_문제로_보지_않는다() {
+        assert!(!is_stale_lock_error(""));
+        assert!(!is_stale_lock_error(
+            "ERROR: Exception occurred: NoConnectException"
+        ));
+        assert!(!is_stale_lock_error("lock"));
+    }
+
+    #[test]
+    fn 잠금_파일은_프로필_디렉토리_바로_아래에_있다() {
+        assert_eq!(
+            profile_lock_file(Path::new("/data/profile")),
+            PathBuf::from("/data/profile/.lock")
+        );
     }
 
     #[test]

@@ -6,6 +6,7 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
+use crate::core::fs_port::FileSystem;
 use crate::core::runtime::assets::{Os, JRE_VERSION};
 
 /// 앱이 확장을 풀어 넣는 디렉토리 이름.
@@ -194,6 +195,27 @@ pub fn java_home_candidates(extracted_root: &Path, os: Os) -> Vec<PathBuf> {
 /// Temurin 아카이브가 만드는 최상위 디렉토리 이름 (`21.0.12+8` → `jdk-21.0.12+8-jre`).
 pub fn jre_dir_name() -> String {
     format!("jdk-{JRE_VERSION}-jre")
+}
+
+/// `JAVA_HOME` 이 진짜인지 확인할 때 보는 실행 파일.
+pub fn java_executable(java_home: &Path, os: Os) -> PathBuf {
+    let name = match os {
+        Os::MacOs => "java",
+        Os::Windows => "java.exe",
+    };
+
+    java_home.join("bin").join(name)
+}
+
+/// 압축을 푼 트리에서 실제로 쓸 수 있는 `JAVA_HOME` 을 고른다.
+///
+/// **디렉토리가 있다는 것만으로 인정하면 안 된다.** 다운로드가 중간에 끊겨 빈 폴더만
+/// 남은 경우 이를 준비됨으로 오해하고 JRE 설치를 영영 건너뛰게 되며, 그 상태로 초기화된
+/// soffice 프로필은 이후 계속 `source file could not be loaded` 로 실패한다.
+pub fn resolve_java_home(root: &Path, os: Os, fs: &dyn FileSystem) -> Option<PathBuf> {
+    java_home_candidates(root, os)
+        .into_iter()
+        .find(|candidate| fs.is_file(&java_executable(candidate, os)))
 }
 
 #[cfg(test)]
@@ -445,6 +467,51 @@ mod tests {
                 "루트 폴백이 없다: {listed:?}"
             );
         }
+    }
+
+    #[test]
+    fn 빈_디렉토리는_java_home_으로_인정하지_않는다() {
+        // 다운로드가 끊겨 폴더만 남으면 준비됨으로 오해해 JRE 설치를 영영 건너뛴다.
+        use crate::core::fs_port::fake::FakeFs;
+
+        let fs = FakeFs::new().with_dir("/data/jre");
+
+        assert_eq!(
+            resolve_java_home(Path::new("/data/jre"), Os::MacOs, &fs),
+            None
+        );
+    }
+
+    #[test]
+    fn java_실행파일이_있는_후보만_java_home_이_된다() {
+        use crate::core::fs_port::fake::FakeFs;
+
+        let home = format!("/data/jre/{}/Contents/Home", jre_dir_name());
+        let fs = FakeFs::new().with_file(format!("{home}/bin/java"), b"bin".to_vec());
+
+        assert_eq!(
+            resolve_java_home(Path::new("/data/jre"), Os::MacOs, &fs),
+            Some(PathBuf::from(home))
+        );
+    }
+
+    #[test]
+    fn 윈도는_java_exe_를_본다() {
+        use crate::core::fs_port::fake::FakeFs;
+
+        let home = format!("/data/jre/{}", jre_dir_name());
+        // 확장자 없는 java 만 있으면 윈도에서는 인정하지 않는다.
+        let unix_only = FakeFs::new().with_file(format!("{home}/bin/java"), b"bin".to_vec());
+        assert_eq!(
+            resolve_java_home(Path::new("/data/jre"), Os::Windows, &unix_only),
+            None
+        );
+
+        let windows = FakeFs::new().with_file(format!("{home}/bin/java.exe"), b"bin".to_vec());
+        assert_eq!(
+            resolve_java_home(Path::new("/data/jre"), Os::Windows, &windows),
+            Some(PathBuf::from(home))
+        );
     }
 
     #[test]

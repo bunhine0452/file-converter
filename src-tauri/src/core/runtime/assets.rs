@@ -142,6 +142,12 @@ pub fn jre_asset(platform: Platform) -> AssetSpec {
 }
 
 /// H2Orestart 0.7.13 확장 (GPLv3) — 코드로 링크하지 않고 unopkg 로만 설치한다.
+/// 내려받은 파일에 붙일 이름. **확장자를 반드시 살려야 한다** —
+/// 확장자가 없으면 `.tar.gz` 를 zip 으로 풀려다 실패한다.
+pub fn asset_file_name(spec: &AssetSpec) -> &'static str {
+    spec.url.rsplit('/').next().unwrap_or("asset")
+}
+
 pub fn h2orestart_asset() -> AssetSpec {
     AssetSpec {
         url: "https://github.com/ebandal/H2Orestart/releases/download/v0.7.13/H2Orestart.oxt",
@@ -260,6 +266,61 @@ mod tests {
             // 호스트가 정해졌다면 자산표에도 반드시 항목이 있어야 한다.
             assert!(!libreoffice_asset(platform).url.is_empty());
             assert!(!jre_asset(platform).url.is_empty());
+        }
+    }
+}
+
+#[cfg(test)]
+mod file_name_tests {
+    use super::*;
+
+    fn mac() -> Platform {
+        Platform::new(Os::MacOs, Arch::Aarch64)
+    }
+
+    fn win() -> Platform {
+        Platform::new(Os::Windows, Arch::X86_64)
+    }
+
+    // ── happy path ───────────────────────────────────────────────
+
+    #[test]
+    fn 자산_파일명은_url_의_마지막_조각이다() {
+        assert_eq!(
+            asset_file_name(&libreoffice_asset(mac())),
+            "LibreOffice_26.2.5_MacOS_aarch64.dmg"
+        );
+        assert_eq!(asset_file_name(&h2orestart_asset()), "H2Orestart.oxt");
+    }
+
+    // ── edge cases ───────────────────────────────────────────────
+
+    #[test]
+    fn 맥_jre_는_tar_gz_확장자를_유지한다() {
+        // 확장자를 잃으면 압축 형식을 못 알아본다 (실제로 설치가 여기서 깨졌다).
+        let name = asset_file_name(&jre_asset(mac()));
+
+        assert!(name.ends_with(".tar.gz"), "실제 이름: {name}");
+    }
+
+    #[test]
+    fn 윈도_jre_는_zip_확장자를_유지한다() {
+        assert!(asset_file_name(&jre_asset(win())).ends_with(".zip"));
+    }
+
+    #[test]
+    fn 모든_플랫폼_자산의_이름에_확장자가_있다() {
+        for platform in [
+            mac(),
+            Platform::new(Os::MacOs, Arch::X86_64),
+            win(),
+            Platform::new(Os::Windows, Arch::Aarch64),
+        ] {
+            for spec in [libreoffice_asset(platform), jre_asset(platform)] {
+                let name = asset_file_name(&spec);
+                assert!(name.contains('.'), "확장자 없음: {name}");
+                assert!(!name.is_empty());
+            }
         }
     }
 }
