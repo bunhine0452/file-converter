@@ -11,7 +11,7 @@ use crate::core::fs_port::FileSystem;
 use crate::core::runtime::assets::Os;
 use crate::core::runtime::installer::{
     bundled_extension_dir, ditto_args, hdiutil_attach_args, hdiutil_detach_args,
-    java_home_candidates, msiexec_admin_args, parse_hdiutil_mount_point, soffice_candidates,
+    msiexec_admin_args, parse_hdiutil_mount_point, resolve_java_home, soffice_candidates,
     xattr_clear_quarantine_args, InstallError, ToolInstaller,
 };
 use crate::core::soffice::runner::{ProcessRequest, ProcessRunner, Termination};
@@ -156,11 +156,7 @@ impl ToolInstaller for RealInstaller {
     fn install_jre(&self, archive: &Path, dest: &Path) -> Result<PathBuf, InstallError> {
         self.extract_archive(archive, dest)?;
 
-        // 디렉토리가 있다는 것만으로는 부족하다 — 빈 폴더를 JAVA_HOME 으로 넘기면
-        // 나중에 soffice 가 "source file could not be loaded" 로 애매하게 실패한다.
-        java_home_candidates(dest, self.os)
-            .into_iter()
-            .find(|candidate| self.fs.is_file(&java_executable(candidate, self.os)))
+        resolve_java_home(dest, self.os, self.fs.as_ref())
             .ok_or_else(|| InstallError::NotFoundAfterInstall("JAVA_HOME".to_string()))
     }
 
@@ -176,16 +172,6 @@ impl ToolInstaller for RealInstaller {
 /// 확장을 풀어 넣을 위치. 설치 트리를 알 수 없으면 `None`.
 pub fn extension_target_dir(soffice: &Path, os: Os) -> Option<PathBuf> {
     bundled_extension_dir(soffice, os)
-}
-
-/// `JAVA_HOME` 이 진짜인지 확인할 때 보는 실행 파일.
-fn java_executable(java_home: &Path, os: Os) -> PathBuf {
-    let name = match os {
-        Os::MacOs => "java",
-        Os::Windows => "java.exe",
-    };
-
-    java_home.join("bin").join(name)
 }
 
 fn is_tarball(archive: &Path) -> bool {
