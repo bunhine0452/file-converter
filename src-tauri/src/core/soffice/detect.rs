@@ -343,17 +343,24 @@ mod tests {
         ProfileUrl::from_path_str("/tmp/fc-profile", false).expect("절대 경로")
     }
 
+    /// 경로 구분자는 호스트마다 다르다(Windows 에서 `join` 은 역슬래시를 넣는다).
+    /// 문자열로 비교하기 전에 슬래시로 통일해 어느 러너에서도 같은 결과가 나오게 한다.
+    fn normalize(path: &str) -> String {
+        path.replace('\\', "/")
+    }
+
     fn paths(candidates: &[Candidate]) -> Vec<String> {
         candidates
             .iter()
-            .map(|candidate| candidate.exe.to_string_lossy().into_owned())
+            .map(|candidate| normalize(&candidate.exe.to_string_lossy()))
             .collect()
     }
 
     fn position_of(candidates: &[Candidate], needle: &str) -> usize {
+        let needle = normalize(needle);
         paths(candidates)
             .iter()
-            .position(|path| path == needle)
+            .position(|path| *path == needle)
             .unwrap_or_else(|| panic!("후보에 없음: {needle}"))
     }
 
@@ -436,7 +443,7 @@ mod tests {
         // Assert
         for (_, _, dir) in combos {
             assert!(
-                found.contains(&format!(r"{dir}\soffice.com")),
+                found.contains(&normalize(&format!(r"{dir}\soffice.com"))),
                 "누락된 조합: {dir}"
             );
         }
@@ -557,12 +564,12 @@ mod tests {
         let found = paths(&candidates_windows(&probe));
 
         // Assert
-        assert!(
-            found.contains(&r"C:\Program Files (x86)\LibreOffice\program\soffice.com".to_string())
-        );
-        assert!(
-            found.contains(&r"C:\Program Files (x86)\LibreOffice\program\soffice.exe".to_string())
-        );
+        assert!(found.contains(&normalize(
+            r"C:\Program Files (x86)\LibreOffice\program\soffice.com"
+        )));
+        assert!(found.contains(&normalize(
+            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe"
+        )));
     }
 
     #[test]
@@ -634,7 +641,10 @@ mod tests {
         let found = candidates_macos(&probe);
 
         // Assert
-        let repeats = paths(&found).iter().filter(|p| *p == MAC_SYSTEM).count();
+        let repeats = paths(&found)
+            .iter()
+            .filter(|p| **p == normalize(MAC_SYSTEM))
+            .count();
         assert_eq!(repeats, 1);
         assert_eq!(found[0].origin, Origin::UserOverride);
     }
