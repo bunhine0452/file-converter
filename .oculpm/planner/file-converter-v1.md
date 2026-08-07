@@ -11,22 +11,22 @@ owner: claude-code
 Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데모는 HWP/HWPX→PDF 드래그&드롭, 이후 이미지·Office·PDF 유틸·미디어로 확장. 근거: .oculpm/discussion/file-converter-stack.
 
 ## Phase 1 — 기반: 스캐폴드·저장소·CI {#ph1-foundation}
-- [ ] 리서치에서 확정한 버전으로 환경 구성·스캐폴드 (Tauri 2.11.x + React 19 + Vite + Tailwind v4 + TypeScript + Vitest) {#scaffold}
-  - [ ] create-tauri-app으로 스캐폴드 후 `pnpm tauri dev`가 빈 창을 띄운다 {#scaffold-app}
-  - [ ] Tailwind CSS v4(@tailwindcss/vite)와 shadcn/ui 초기화가 데모 버튼 렌더로 확인된다 {#scaffold-tailwind}
-  - [ ] Vitest 샘플 테스트와 `cargo test` 샘플 테스트가 로컬에서 통과한다 {#scaffold-test}
-  - [ ] ESLint+Prettier, rustfmt+clippy 설정이 커밋 훅 없이 스크립트로 실행된다 {#scaffold-lint}
+- [x] 리서치에서 확정한 버전으로 환경 구성·스캐폴드 (Tauri 2.11.x + React 19 + Vite + Tailwind v4 + TypeScript + Vitest) {#scaffold}
+  - [x] create-tauri-app으로 스캐폴드 후 `pnpm tauri dev`가 빈 창을 띄운다 {#scaffold-app}
+  - [x] Tailwind CSS v4(@tailwindcss/vite)와 shadcn/ui 초기화가 데모 버튼 렌더로 확인된다 {#scaffold-tailwind}
+  - [x] Vitest 샘플 테스트와 `cargo test` 샘플 테스트가 로컬에서 통과한다 {#scaffold-test}
+  - [x] ESLint+Prettier, rustfmt+clippy 설정이 커밋 훅 없이 스크립트로 실행된다 {#scaffold-lint}
 - [x] GitHub 퍼블릭 저장소 공개 준비 (bunhine0452/file-converter, MIT) {#repo-setup}
   - [x] git init + 초기 커밋 + gh로 퍼블릭 리포 생성·푸시가 완료된다 {#repo-init}
   - [x] MIT LICENSE, README 뼈대(프로젝트 소개·설치형 이유), .gitignore가 커밋된다 {#repo-license}
   - [x] THIRD-PARTY-NOTICES에 LibreOffice(MPL)·H2Orestart(GPL, 외부 프로세스)·FFmpeg(LGPL)·PDFium 고지 초안이 들어간다 {#repo-notice}
-- [ ] CI 빌드 파이프라인이 그린이다 {#ci-pipeline}
-  - [ ] GitHub Actions에서 lint+Vitest+cargo test가 PR마다 실행된다 {#ci-test}
-  - [ ] mac(aarch64)/win(x64) tauri 빌드 매트릭스가 아티팩트(dmg/nsis)를 생성한다 {#ci-build}
-- [ ] 변환 코어 골격 (작업 큐·타입 감지·진행 이벤트) {#core-skeleton}
-  - [ ] Rust 변환 작업 큐(등록/취소/상태)가 단위 테스트로 검증된다 {#core-job-queue}
-  - [ ] 확장자+매직 바이트 파일 타입 감지가 hwp/hwpx/png/jpg/pdf 샘플로 테스트 통과한다 {#core-detect}
-  - [ ] Rust→프론트 진행률 이벤트 브리지가 데모 카운터로 동작한다 {#core-events}
+- [~] CI 빌드 파이프라인이 그린이다 {#ci-pipeline}
+  - [~] GitHub Actions에서 lint+Vitest+cargo test가 PR마다 실행된다 {#ci-test}
+  - [~] mac(aarch64)/win(x64) tauri 빌드 매트릭스가 아티팩트(dmg/nsis)를 생성한다 {#ci-build}
+- [x] 변환 코어 골격 (작업 큐·타입 감지·진행 이벤트) {#core-skeleton}
+  - [x] Rust 변환 작업 큐(등록/취소/상태)가 단위 테스트로 검증된다 {#core-job-queue}
+  - [x] 확장자+매직 바이트 파일 타입 감지가 hwp/hwpx/png/jpg/pdf 샘플로 테스트 통과한다 {#core-detect}
+  - [x] Rust→프론트 진행률 이벤트 브리지가 데모 카운터로 동작한다 {#core-events}
 
 ## Phase 2 — 첫 데모: HWP/HWPX → PDF 드래그&드롭 {#ph2-hwp-demo}
 - [ ] LibreOffice 런타임 매니저 (감지 + 온디맨드 다운로드) {#lo-runtime}
@@ -108,4 +108,13 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
 | 2026-08-07T14:56:46+09:00 | #repo-init | claude-code | ☐→x | .oculpm/journal/20260807/Chores/1456_chore_project-inception-file-converter.md | gh로 퍼블릭 리포 생성·푸시 완료 |
 | 2026-08-07T14:56:54+09:00 | #repo-license | claude-code | ☐→x | .oculpm/journal/20260807/Chores/1456_chore_project-inception-file-converter.md | MIT LICENSE·README 뼈대·.gitignore 초기 커밋 포함 |
 | 2026-08-07T14:57:03+09:00 | #repo-notice | claude-code | ☐→x | .oculpm/journal/20260807/Chores/1456_chore_project-inception-file-converter.md | THIRD-PARTY-NOTICES 초안(LO·H2Orestart·FFmpeg·PDFium) 커밋 |
+| 2026-08-07T15:45:05+09:00 | #scaffold-app | claude-code | ☐→x | .oculpm/journal/20260807/Features_to_add/1544_feature_phase1-scaffold-and-core-skeleton.md | Tauri 2.11.5 + React 19 스캐폴드, pnpm tauri dev 로 창 확인 |
+| 2026-08-07T15:45:12+09:00 | #scaffold-tailwind | claude-code | ☐→x | .oculpm/journal/20260807/Features_to_add/1544_feature_phase1-scaffold-and-core-skeleton.md | @tailwindcss/vite + shadcn Button 렌더 확인 (스크린샷) |
+| 2026-08-07T15:45:19+09:00 | #scaffold-test | claude-code | ☐→x | .oculpm/journal/20260807/Features_to_add/1544_feature_phase1-scaffold-and-core-skeleton.md | Vitest 17개 · cargo test 38개 로컬 그린 |
+| 2026-08-07T15:45:25+09:00 | #scaffold-lint | claude-code | ☐→x | .oculpm/journal/20260807/Features_to_add/1544_feature_phase1-scaffold-and-core-skeleton.md | pnpm lint / rust:fmt / rust:lint 스크립트, 훅 없이 실행 |
+| 2026-08-07T15:45:32+09:00 | #core-detect | claude-code | ☐→x | .oculpm/journal/20260807/Features_to_add/1544_feature_phase1-scaffold-and-core-skeleton.md | TDD 14 테스트 — hwp/hwpx/pdf/png/jpg + 확장자 불일치·컨테이너 에지 |
+| 2026-08-07T15:45:38+09:00 | #core-job-queue | claude-code | ☐→x | .oculpm/journal/20260807/Features_to_add/1544_feature_phase1-scaffold-and-core-skeleton.md | TDD 13 테스트 — 상태 기계·취소 2단계·동시 등록 |
+| 2026-08-07T15:45:44+09:00 | #core-events | claude-code | ☐→x | .oculpm/journal/20260807/Features_to_add/1544_feature_phase1-scaffold-and-core-skeleton.md | EventSink 추상화 + 데모 카운터 0→50→100% 실제 앱에서 확인 |
+| 2026-08-07T15:45:52+09:00 | #ci-test | claude-code | ☐→~ | .oculpm/journal/20260807/Features_to_add/1544_feature_phase1-scaffold-and-core-skeleton.md | ci.yml 작성 완료 — 푸시 후 Actions 그린 확인 필요 |
+| 2026-08-07T15:45:58+09:00 | #ci-build | claude-code | ☐→~ | .oculpm/journal/20260807/Features_to_add/1544_feature_phase1-scaffold-and-core-skeleton.md | build.yml(mac aarch64/win x64 매트릭스) 작성 — 아티팩트 생성 미검증 |
 <!-- oculpm:plan-log end -->
