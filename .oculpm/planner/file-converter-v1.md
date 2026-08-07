@@ -33,7 +33,7 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
   - [x] mac/win 표준 경로·PATH에서 soffice 탐지가 단위 테스트로 검증된다 {#lo-detect}
   - [~] 미설치 시 LibreOffice 26.2.x를 앱 데이터 디렉토리에 다운로드·해시 검증·설치한다 {#lo-download}
   - [~] H2Orestart 0.7.13 확장을 unopkg/프로필로 자동 설치하고 설치 여부를 검증한다 {#lo-h2o}
-  - [ ] 설정 화면에 LibreOffice 상태(감지됨/다운로드 필요/버전)가 표시된다 {#lo-status-ui}
+  - [x] 설정 화면에 LibreOffice 상태(감지됨/다운로드 필요/버전)가 표시된다 {#lo-status-ui}
 - [~] HWP 변환 파이프라인 {#hwp-pipeline}
   - [x] soffice headless 호출 래퍼(임시 프로필·타임아웃·에러 매핑)가 단위 테스트로 검증된다 {#hwp-wrapper}
   - [ ] .hwp 드래그&드롭 → PDF 저장 happy-path가 실제 샘플 파일로 동작한다 (첫 데모) {#hwp-happy}
@@ -42,8 +42,8 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
   - [ ] 100MB급 대용량 HWP가 UI 멈춤 없이 변환된다 (진행 표시 유지) {#hwp-large}
 - [~] 데모 UX: 드롭존·진행률·완료 흐름 {#demo-ux}
   - [x] 드롭존이 드래그 오버/유효·무효 파일 상태를 시각 피드백한다 {#dropzone}
-  - [ ] 파일별 진행률·완료·실패 상태가 큐 리스트에 실시간 표시된다 {#progress-ui}
-  - [ ] 완료 시 저장 위치 열기/파일 열기 액션이 mac/win에서 동작한다 {#output-open}
+  - [x] 파일별 진행률·완료·실패 상태가 큐 리스트에 실시간 표시된다 {#progress-ui}
+  - [~] 완료 시 저장 위치 열기/파일 열기 액션이 mac/win에서 동작한다 {#output-open}
 
 ## Phase 3 — 디자인 시스템·앱 셸 (고급스럽고 편안한 UX) {#ph3-design}
 - [ ] 디자인 토큰·테마 체계 {#design-tokens}
@@ -124,4 +124,7 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
 | 2026-08-07T17:35:35+09:00 | #hwp-errors | claude-code | ☐→~ | .oculpm/journal/20260807/Features_to_add/1734_feature_phase2-core-soffice-hwp-preflight.md | 프리플라이트·메시지 매핑 완료 (암호/DRM 은 실행 전 차단). UI 연결과 실파일 검증 남음 |
 | 2026-08-07T17:35:45+09:00 | #lo-download | claude-code | ☐→~ | .oculpm/journal/20260807/Features_to_add/1734_feature_phase2-core-soffice-hwp-preflight.md | 자산 pin(sha256 9개)·스트리밍 해시 검증·설치 계획 완료. dmg/msi 실제 설치 실행 남음 |
 | 2026-08-07T17:35:52+09:00 | #lo-h2o | claude-code | ☐→~ | .oculpm/journal/20260807/Features_to_add/1734_feature_phase2-core-soffice-hwp-preflight.md | unopkg argv·list 파서·설치 전략(번들/프로필) 완료. 실제 unopkg 실행 검증 남음 |
+| 2026-08-07T18:32:35+09:00 | #lo-status-ui | claude-code | ☐→x | .oculpm/journal/20260807/Features_to_add/1832_feature_phase2-runtime-install-and-ui.md | RuntimeStatus 컴포넌트 — 준비 상태·버전·설치 버튼·진행 막대, 조회 실패도 표시 |
+| 2026-08-07T18:32:44+09:00 | #progress-ui | claude-code | ☐→x | .oculpm/journal/20260807/Features_to_add/1832_feature_phase2-runtime-install-and-ui.md | ConversionQueue — 파일별 상태·진행률·실패 사유 실시간 표시 (이벤트 유실 방어 포함) |
+| 2026-08-07T18:32:52+09:00 | #output-open | claude-code | ☐→~ | .oculpm/journal/20260807/Features_to_add/1832_feature_phase2-runtime-install-and-ui.md | revealItemInDir 로 저장 위치 열기 구현. mac/win 실기 확인 남음 |
 <!-- oculpm:plan-log end -->
