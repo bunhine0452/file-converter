@@ -21,7 +21,7 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
   - [x] MIT LICENSE, README 뼈대(프로젝트 소개·설치형 이유), .gitignore가 커밋된다 {#repo-license}
   - [x] THIRD-PARTY-NOTICES에 LibreOffice(MPL)·H2Orestart(GPL, 외부 프로세스)·FFmpeg(LGPL)·PDFium 고지 초안이 들어간다 {#repo-notice}
 - [~] CI 빌드 파이프라인이 그린이다 {#ci-pipeline}
-  - [~] GitHub Actions에서 lint+Vitest+cargo test가 PR마다 실행된다 {#ci-test}
+  - [x] GitHub Actions에서 lint+Vitest+cargo test가 PR마다 실행된다 {#ci-test}
   - [~] mac(aarch64)/win(x64) tauri 빌드 매트릭스가 아티팩트(dmg/nsis)를 생성한다 {#ci-build}
 - [x] 변환 코어 골격 (작업 큐·타입 감지·진행 이벤트) {#core-skeleton}
   - [x] Rust 변환 작업 큐(등록/취소/상태)가 단위 테스트로 검증된다 {#core-job-queue}
@@ -117,4 +117,5 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
 | 2026-08-07T15:45:44+09:00 | #core-events | claude-code | ☐→x | .oculpm/journal/20260807/Features_to_add/1544_feature_phase1-scaffold-and-core-skeleton.md | EventSink 추상화 + 데모 카운터 0→50→100% 실제 앱에서 확인 |
 | 2026-08-07T15:45:52+09:00 | #ci-test | claude-code | ☐→~ | .oculpm/journal/20260807/Features_to_add/1544_feature_phase1-scaffold-and-core-skeleton.md | ci.yml 작성 완료 — 푸시 후 Actions 그린 확인 필요 |
 | 2026-08-07T15:45:58+09:00 | #ci-build | claude-code | ☐→~ | .oculpm/journal/20260807/Features_to_add/1544_feature_phase1-scaffold-and-core-skeleton.md | build.yml(mac aarch64/win x64 매트릭스) 작성 — 아티팩트 생성 미검증 |
+| 2026-08-07T15:55:34+09:00 | #ci-test | claude-code | ~→x | .oculpm/journal/20260807/Features_to_add/1544_feature_phase1-scaffold-and-core-skeleton.md | PR #1 에서 프론트·코어(macOS/Windows) 3개 잡 전부 그린 확인 |
 <!-- oculpm:plan-log end -->
