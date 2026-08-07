@@ -543,8 +543,9 @@ mod tests {
 
     #[test]
     fn 프로필_url_은_env_인자로_바로_쓸_수_있다() {
-        let paths =
-            RuntimePaths::new(Path::new("/data/fc"), platform(Os::MacOs)).expect("경로 생성");
+        // ProfileUrl 은 호스트 규칙으로 절대 경로를 요구하므로 기준 경로도 호스트 것을 쓴다.
+        let base = std::env::temp_dir().join("fc-runtime-paths");
+        let paths = RuntimePaths::new(&base, platform(Os::MacOs)).expect("경로 생성");
 
         let arg = paths.profile_url().expect("URL").as_arg();
 
