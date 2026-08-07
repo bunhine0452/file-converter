@@ -16,10 +16,10 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
   - [ ] Tailwind CSS v4(@tailwindcss/vite)와 shadcn/ui 초기화가 데모 버튼 렌더로 확인된다 {#scaffold-tailwind}
   - [ ] Vitest 샘플 테스트와 `cargo test` 샘플 테스트가 로컬에서 통과한다 {#scaffold-test}
   - [ ] ESLint+Prettier, rustfmt+clippy 설정이 커밋 훅 없이 스크립트로 실행된다 {#scaffold-lint}
-- [ ] GitHub 퍼블릭 저장소 공개 준비 (bunhine0452/file-converter, MIT) {#repo-setup}
-  - [ ] git init + 초기 커밋 + gh로 퍼블릭 리포 생성·푸시가 완료된다 {#repo-init}
-  - [ ] MIT LICENSE, README 뼈대(프로젝트 소개·설치형 이유), .gitignore가 커밋된다 {#repo-license}
-  - [ ] THIRD-PARTY-NOTICES에 LibreOffice(MPL)·H2Orestart(GPL, 외부 프로세스)·FFmpeg(LGPL)·PDFium 고지 초안이 들어간다 {#repo-notice}
+- [x] GitHub 퍼블릭 저장소 공개 준비 (bunhine0452/file-converter, MIT) {#repo-setup}
+  - [x] git init + 초기 커밋 + gh로 퍼블릭 리포 생성·푸시가 완료된다 {#repo-init}
+  - [x] MIT LICENSE, README 뼈대(프로젝트 소개·설치형 이유), .gitignore가 커밋된다 {#repo-license}
+  - [x] THIRD-PARTY-NOTICES에 LibreOffice(MPL)·H2Orestart(GPL, 외부 프로세스)·FFmpeg(LGPL)·PDFium 고지 초안이 들어간다 {#repo-notice}
 - [ ] CI 빌드 파이프라인이 그린이다 {#ci-pipeline}
   - [ ] GitHub Actions에서 lint+Vitest+cargo test가 PR마다 실행된다 {#ci-test}
   - [ ] mac(aarch64)/win(x64) tauri 빌드 매트릭스가 아티팩트(dmg/nsis)를 생성한다 {#ci-build}
@@ -105,4 +105,7 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
 <!-- oculpm:plan-log begin v1 -->
 | 시각 | 항목 | 에이전트 | 변화 | 일지 | 메모 |
 |---|---|---|---|---|---|
+| 2026-08-07T14:56:46+09:00 | #repo-init | claude-code | ☐→x | .oculpm/journal/20260807/Chores/1456_chore_project-inception-file-converter.md | gh로 퍼블릭 리포 생성·푸시 완료 |
+| 2026-08-07T14:56:54+09:00 | #repo-license | claude-code | ☐→x | .oculpm/journal/20260807/Chores/1456_chore_project-inception-file-converter.md | MIT LICENSE·README 뼈대·.gitignore 초기 커밋 포함 |
+| 2026-08-07T14:57:03+09:00 | #repo-notice | claude-code | ☐→x | .oculpm/journal/20260807/Chores/1456_chore_project-inception-file-converter.md | THIRD-PARTY-NOTICES 초안(LO·H2Orestart·FFmpeg·PDFium) 커밋 |
 <!-- oculpm:plan-log end -->
