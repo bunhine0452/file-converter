@@ -6,6 +6,7 @@
 |---|---|---|
 | [LibreOffice](https://www.libreoffice.org/) | MPL-2.0 | 온디맨드 다운로드, `soffice --headless` 외부 프로세스 (HWP/사무 문서 변환) |
 | [H2Orestart](https://github.com/ebandal/H2Orestart) | GPL-3.0 | LibreOffice 확장으로 설치되어 LibreOffice 내부에서 실행 (HWP/HWPX 임포트 필터) |
+| [Eclipse Temurin JRE 21](https://adoptium.net/) | GPL-2.0 with Classpath Exception | 온디맨드 다운로드. H2Orestart 가 Java 확장이라 LibreOffice 가 실행할 JRE 가 필요하다 |
 | [FFmpeg](https://ffmpeg.org/) | LGPL-2.1+ (LGPL 빌드만 번들) | 사이드카 바이너리 (미디어 변환) |
 | [PDFium](https://pdfium.googlesource.com/pdfium/) | Apache-2.0/BSD | pdfium-render 크레이트 경유 (PDF 렌더·유틸) |
 

@@ -6,7 +6,16 @@ import tseslint from "typescript-eslint";
 import prettier from "eslint-config-prettier";
 
 export default tseslint.config(
-  { ignores: ["dist", "src-tauri/target", "src-tauri/gen", "coverage"] },
+  {
+    ignores: [
+      "dist",
+      "src-tauri/target",
+      "src-tauri/gen",
+      "coverage",
+      // 에이전트 작업용 git worktree — 자체 tsconfig 를 갖고 있어 파서를 혼란시킨다
+      ".claude/worktrees/**",
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
