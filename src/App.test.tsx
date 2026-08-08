@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { emit } from "@tauri-apps/api/event";
 import { mockTauri, resetTauriMocks, type IpcCall } from "@/test/tauri";
+import { DEFAULT_SETTINGS } from "@/lib/settings";
 import App from "./App";
 
 let ipcCalls: IpcCall[] = [];
@@ -14,11 +15,16 @@ const READY_STATUS = {
 };
 
 /** 저장 다이얼로그는 경로를 돌려주고, 변환 커맨드는 작업 id 를 돌려준다. */
-function respondNormally(savePath: string | null = "/out/계약서.pdf") {
+function respondNormally(
+  savePath: string | null = "/out/계약서.pdf",
+  settings: Record<string, unknown> = {},
+) {
   mockTauri((command) => {
     switch (command) {
       case "get_runtime_status":
         return READY_STATUS;
+      case "get_settings":
+        return { ...DEFAULT_SETTINGS, ...settings };
       case "plugin:dialog|save":
         return savePath;
       case "plugin:dialog|open":
@@ -125,6 +131,52 @@ describe("App", () => {
     expect(
       calledCommands().filter((command) => command === "plan_output_path"),
     ).toHaveLength(2);
+  });
+
+  it("원본과 같은 폴더 설정이면 아무것도 묻지 않는다", async () => {
+    // 저장 위치를 정해 둔 사용자에게 매번 묻는 것은 설정을 무시하는 것이다.
+    respondNormally("/out/계약서.pdf", { saveMode: "sameAsSource" });
+    await renderApp();
+
+    await drop(["/tmp/문서/계약서.hwp"]);
+
+    await waitFor(() => expect(calledCommands()).toContain("convert_hwp"));
+    expect(calledCommands()).not.toContain("plugin:dialog|save");
+    expect(calledCommands()).not.toContain("plugin:dialog|open");
+    const convert = ipcCalls.find((call) => call.command === "convert_hwp");
+    expect(JSON.stringify(convert?.payload)).toContain("/tmp/문서");
+  });
+
+  it("지정 폴더 설정이면 그 폴더로 바로 변환한다", async () => {
+    respondNormally("/out/계약서.pdf", {
+      saveMode: "fixedFolder",
+      outputDir: "/모아둔곳",
+    });
+    await renderApp();
+
+    await drop(["/tmp/계약서.hwp"]);
+
+    await waitFor(() => expect(calledCommands()).toContain("convert_hwp"));
+    expect(calledCommands()).not.toContain("plugin:dialog|save");
+    const planned = ipcCalls.find(
+      (call) => call.command === "plan_output_path",
+    );
+    expect(JSON.stringify(planned?.payload)).toContain("/모아둔곳");
+  });
+
+  it("지정 폴더인데 폴더를 아직 안 골랐으면 물어본다", async () => {
+    // 설정이 반쯤 비어 있다고 말없이 아무 데나 저장하면 파일을 잃어버린다.
+    respondNormally("/out/계약서.pdf", {
+      saveMode: "fixedFolder",
+      outputDir: null,
+    });
+    await renderApp();
+
+    await drop(["/tmp/계약서.hwp"]);
+
+    await waitFor(() =>
+      expect(calledCommands()).toContain("plugin:dialog|save"),
+    );
   });
 
   // ── edge cases ───────────────────────────────────────────────

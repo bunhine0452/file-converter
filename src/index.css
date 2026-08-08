@@ -10,7 +10,9 @@
  * 사용자의 파일이므로, 중성색은 아주 낮은 채도의 차가운 회색으로 깔고 색은
  * 상태(진행·완료·실패)에만 쓴다. 색이 곧 정보라는 규칙을 깨지 않는다.
  *
- * 다크는 OS 설정을 따른다 (아직 테마 토글이 없다 — #shell-settings 에서 붙인다).
+ * 다크 값은 한 벌만 둔다. "시스템"을 실제 밝기로 바꾸는 일은 JS(lib/theme.ts)가 하고
+ * CSS 는 `[data-theme="dark"]` 하나만 본다 — 미디어 쿼리와 명시 선택을 둘 다 CSS 에
+ * 두면 토큰을 두 벌 적어야 하고, 그 순간부터 둘이 어긋난다.
  */
 :root {
   --radius: 0.625rem;
@@ -58,34 +60,38 @@
     "Malgun Gothic", "Noto Sans KR", sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not(.light) {
-    --background: oklch(0.185 0.01 255);
-    --foreground: oklch(0.95 0.004 250);
-    --card: oklch(0.225 0.012 255);
-    --popover: oklch(0.225 0.012 255);
-    --muted: oklch(0.265 0.012 255);
-    --muted-foreground: oklch(0.72 0.012 250);
-    --border: oklch(1 0 0 / 12%);
-    --input: oklch(1 0 0 / 16%);
+/* 폼 컨트롤·스크롤바까지 함께 어두워지게 color-scheme 을 같이 준다. */
+:root {
+  color-scheme: light;
+}
 
-    --primary: oklch(0.93 0.006 250);
-    --primary-foreground: oklch(0.225 0.012 255);
-    --secondary: oklch(0.28 0.014 255);
-    --secondary-foreground: oklch(0.95 0.004 250);
-    --accent: oklch(0.3 0.02 258);
-    --accent-foreground: oklch(0.95 0.004 250);
+:root[data-theme="dark"] {
+  color-scheme: dark;
 
-    /* 어두운 배경에서는 같은 색이 가라앉는다 — 명도를 올려 대비를 유지한다. */
-    --accent-strong: oklch(0.76 0.13 258);
-    --success: oklch(0.76 0.14 155);
-    --destructive: oklch(0.71 0.17 25);
-    --ring: oklch(0.76 0.13 258);
+  --background: oklch(0.185 0.01 255);
+  --foreground: oklch(0.95 0.004 250);
+  --card: oklch(0.225 0.012 255);
+  --popover: oklch(0.225 0.012 255);
+  --muted: oklch(0.265 0.012 255);
+  --muted-foreground: oklch(0.72 0.012 250);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
 
-    --shadow-raised: 0 1px 2px oklch(0 0 0 / 30%);
-    --shadow-overlay:
-      0 8px 24px oklch(0 0 0 / 45%), 0 2px 6px oklch(0 0 0 / 30%);
-  }
+  --primary: oklch(0.93 0.006 250);
+  --primary-foreground: oklch(0.225 0.012 255);
+  --secondary: oklch(0.28 0.014 255);
+  --secondary-foreground: oklch(0.95 0.004 250);
+  --accent: oklch(0.3 0.02 258);
+  --accent-foreground: oklch(0.95 0.004 250);
+
+  /* 어두운 배경에서는 같은 색이 가라앉는다 — 명도를 올려 대비를 유지한다. */
+  --accent-strong: oklch(0.76 0.13 258);
+  --success: oklch(0.76 0.14 155);
+  --destructive: oklch(0.71 0.17 25);
+  --ring: oklch(0.76 0.13 258);
+
+  --shadow-raised: 0 1px 2px oklch(0 0 0 / 30%);
+  --shadow-overlay: 0 8px 24px oklch(0 0 0 / 45%), 0 2px 6px oklch(0 0 0 / 30%);
 }
 
 @theme inline {

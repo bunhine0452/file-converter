@@ -4,7 +4,8 @@ pub mod shell;
 use tauri::Manager;
 
 use shell::commands::{
-    cancel_job, convert_hwp, get_runtime_status, install_runtime, list_jobs, plan_output_path,
+    cancel_job, convert_hwp, get_runtime_status, get_settings, install_runtime, list_jobs,
+    plan_output_path, save_settings,
 };
 use shell::{event_sink::TauriEventSink, AppState};
 
@@ -26,6 +27,8 @@ pub fn run() {
             get_runtime_status,
             install_runtime,
             plan_output_path,
+            get_settings,
+            save_settings,
             convert_hwp
         ])
         .run(tauri::generate_context!())

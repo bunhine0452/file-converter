@@ -16,10 +16,11 @@ const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
  * 통과하는데 화면은 대비 미달인 최악의 조합이 된다.
  */
 function token(name: string, scope: "light" | "dark"): string {
+  const darkAt = css.indexOf(':root[data-theme="dark"]');
   const block =
     scope === "light"
-      ? css.slice(css.indexOf(":root {"), css.indexOf("@media"))
-      : css.slice(css.indexOf("@media"), css.indexOf("@theme"));
+      ? css.slice(css.indexOf(":root {"), darkAt)
+      : css.slice(darkAt, css.indexOf("@theme"));
 
   const match = block.match(new RegExp(`--${name}:\\s*(oklch\\([^)]*\\))`));
   if (!match) throw new Error(`${scope} 스코프에 --${name} 토큰이 없다`);

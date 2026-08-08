@@ -8,4 +8,5 @@ pub mod job;
 pub mod output;
 pub mod progress;
 pub mod runtime;
+pub mod settings;
 pub mod soffice;

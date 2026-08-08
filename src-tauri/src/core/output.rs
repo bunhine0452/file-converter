@@ -6,6 +6,8 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::core::settings::ConflictRule;
+
 const PDF_EXTENSION: &str = "pdf";
 /// 이름이 없는 입력의 최후 이름 (정상 경로에서는 쓰이지 않는다).
 const FALLBACK_STEM: &str = "output";
@@ -21,6 +23,38 @@ pub fn pdf_name_for(source: &Path) -> String {
         .unwrap_or_else(|| FALLBACK_STEM.to_string());
 
     format!("{stem}.{PDF_EXTENSION}")
+}
+
+/// 접미사를 붙인 산출물 이름 (`보고서.hwp` + `_변환` → `보고서_변환.pdf`).
+pub fn output_name(source: &Path, suffix: &str) -> String {
+    let name = pdf_name_for(source);
+    if suffix.is_empty() {
+        return name;
+    }
+
+    let stem = Path::new(&name)
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().into_owned())
+        .unwrap_or_else(|| FALLBACK_STEM.to_string());
+
+    format!("{stem}{suffix}.{PDF_EXTENSION}")
+}
+
+/// 설정(접미사·충돌 규칙)을 반영한 최종 경로.
+pub fn resolve_output_path(
+    dir: &Path,
+    source: &Path,
+    suffix: &str,
+    conflict: ConflictRule,
+    exists: &dyn Fn(&Path) -> bool,
+) -> PathBuf {
+    let name = output_name(source, suffix);
+
+    match conflict {
+        // 사용자가 덮어쓰기를 골랐으면 번호를 붙이는 게 오히려 배신이다.
+        ConflictRule::Overwrite => dir.join(name),
+        ConflictRule::Number => unique_output_path(dir, &name, exists),
+    }
 }
 
 /// `dir` 안에서 겹치지 않는 경로. 이미 있으면 ` (1)`, ` (2)` … 를 붙인다.
@@ -134,5 +168,64 @@ mod tests {
 
         assert!(path.starts_with("/out"));
         assert!(path.to_string_lossy().ends_with(".pdf"));
+    }
+
+    // ── 설정 반영 ────────────────────────────────────────────────
+
+    #[test]
+    fn 접미사는_확장자_앞에_붙는다() {
+        assert_eq!(
+            output_name(Path::new("/tmp/보고서.hwp"), "_변환"),
+            "보고서_변환.pdf"
+        );
+        assert_eq!(
+            output_name(Path::new("/tmp/보고서.v2.hwpx"), " (변환)"),
+            "보고서.v2 (변환).pdf"
+        );
+    }
+
+    #[test]
+    fn 접미사가_비면_원본_이름_그대로다() {
+        assert_eq!(output_name(Path::new("/tmp/보고서.hwp"), ""), "보고서.pdf");
+    }
+
+    #[test]
+    fn 덮어쓰기_규칙이면_겹쳐도_같은_경로를_준다() {
+        // 사용자가 덮어쓰기를 골랐으면 번호를 붙이는 게 오히려 배신이다.
+        let path = resolve_output_path(
+            Path::new("/out"),
+            Path::new("/tmp/보고서.hwp"),
+            "",
+            ConflictRule::Overwrite,
+            &|_| true,
+        );
+
+        assert_eq!(path, PathBuf::from("/out/보고서.pdf"));
+    }
+
+    #[test]
+    fn 번호_규칙이면_겹칠_때_번호를_붙인다() {
+        let path = resolve_output_path(
+            Path::new("/out"),
+            Path::new("/tmp/보고서.hwp"),
+            "",
+            ConflictRule::Number,
+            &taken(&["/out/보고서.pdf"]),
+        );
+
+        assert_eq!(path, PathBuf::from("/out/보고서 (1).pdf"));
+    }
+
+    #[test]
+    fn 접미사와_번호는_함께_적용된다() {
+        let path = resolve_output_path(
+            Path::new("/out"),
+            Path::new("/tmp/보고서.hwp"),
+            "_변환",
+            ConflictRule::Number,
+            &taken(&["/out/보고서_변환.pdf"]),
+        );
+
+        assert_eq!(path, PathBuf::from("/out/보고서_변환 (1).pdf"));
     }
 }

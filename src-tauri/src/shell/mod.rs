@@ -22,6 +22,9 @@ pub struct AppState {
     pub reporter: Arc<JobReporter<TauriEventSink>>,
     /// 지원하지 않는 플랫폼이면 None — 앱은 뜨되 변환 기능만 막힌다.
     pub runtime: Option<Arc<RuntimeManager>>,
+    /// 사용자 설정 파일. 런타임 디렉토리가 아니라 앱 데이터 루트에 둔다
+    /// (런타임을 지워도 설정은 남아야 한다).
+    pub settings_path: std::path::PathBuf,
 }
 
 impl AppState {
@@ -29,6 +32,7 @@ impl AppState {
         Self {
             reporter: Arc::new(JobReporter::new(Arc::new(JobQueue::new()), sink)),
             runtime: build_runtime(app_local_data_dir),
+            settings_path: app_local_data_dir.join("settings.json"),
         }
     }
 }
