@@ -38,7 +38,7 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
   - [x] soffice headless 호출 래퍼(임시 프로필·타임아웃·에러 매핑)가 단위 테스트로 검증된다 {#hwp-wrapper}
   - [~] .hwp 드래그&드롭 → PDF 저장 happy-path가 실제 샘플 파일로 동작한다 (첫 데모) {#hwp-happy}
   - [~] .hwpx 동일 경로가 실제 샘플 파일로 동작한다 {#hwpx-happy}
-  - [~] 암호 문서·배포용 문서·손상 파일이 사용자 친화 에러 메시지로 처리된다 {#hwp-errors}
+  - [x] 암호 문서·배포용 문서·손상 파일이 사용자 친화 에러 메시지로 처리된다 {#hwp-errors}
   - [x] 100MB급 대용량 HWP가 UI 멈춤 없이 변환된다 (진행 표시 유지) {#hwp-large}
 - [~] 데모 UX: 드롭존·진행률·완료 흐름 {#demo-ux}
   - [x] 드롭존이 드래그 오버/유효·무효 파일 상태를 시각 피드백한다 {#dropzone}
@@ -134,4 +134,5 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
 | 2026-08-07T20:22:25+09:00 | #hwp-errors | claude-code | ~→~ | .oculpm/journal/20260807/Bugs/2022_bug_preflight-note-dropped-before-ui.md | 배포용·HWPX암호화 안내가 코어→이벤트→UI로 연결됨(TDD). 실샘플 손검증 남음 |
 | 2026-08-08T20:40:50+09:00 | #hwp-large | claude-code | ☐→x | .oculpm/journal/20260808/Features_to_add/2040_feature_large-doc-progress-heartbeat.md | 105MB/1621쪽 105.9s 성공 · 1초 하트비트로 5%→34% 갱신 · 상태조회 메인스레드 차단 제거 |
 | 2026-08-08T20:40:58+09:00 | #lo-h2o | claude-code | x→x | .oculpm/journal/20260808/Bugs/2040_bug_extension-query-scope-too-narrow.md | 번들-only 조회 회귀 수정 — 두 스코프 병합. 실환경 Registered 0.7.13 복귀 |
+| 2026-08-08T20:45:31+09:00 | #hwp-errors | claude-code | ~→x | .oculpm/journal/20260808/Bugs/2045_bug_leaky-inspect-error-messages.md | 실물 .hwp 변형 4종 검증 — 배포용/암호/잘림/가짜 모두 한국어 안내. 진짜 암호화 문서만 미확인 |
 <!-- oculpm:plan-log end -->

@@ -25,7 +25,8 @@
       "@/*": ["./src/*"]
     },
 
-    "types": ["vitest/globals", "@testing-library/jest-dom"]
+    // node 는 테스트에서 디자인 토큰 CSS 를 읽을 때만 쓴다 (앱 번들에는 들어가지 않는다).
+    "types": ["vitest/globals", "@testing-library/jest-dom", "node"]
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]

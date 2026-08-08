@@ -224,6 +224,34 @@ describe("useConversionQueue", () => {
     expect(result.current.items[0].message).toBe("변환 실패");
   });
 
+  // ── 목록 정리 ────────────────────────────────────────────────
+
+  it("끝난 항목만 목록에서 치운다", async () => {
+    // 진행 중인 변환까지 사라지면 그 작업의 결과를 다시는 볼 수 없다.
+    const { result } = await renderQueue();
+    act(() => result.current.track(1, "/tmp/a.hwp", "/out/a.pdf"));
+    act(() => result.current.track(2, "/tmp/b.hwp", "/out/b.pdf"));
+    act(() => result.current.track(3, "/tmp/c.hwp", "/out/c.pdf"));
+
+    await sendJobEvent({ kind: "completed", id: 1 });
+    await sendJobEvent({ kind: "failed", id: 2, message: "실패" });
+    await sendJobEvent({ kind: "progress", id: 3, progress: 30 });
+    act(() => result.current.clearFinished());
+
+    expect(result.current.items.map((each) => each.id)).toEqual([3]);
+  });
+
+  it("치운 항목의 뒤늦은 이벤트는 목록을 되살리지 않는다", async () => {
+    const { result } = await renderQueue();
+    act(() => result.current.track(1, "/tmp/a.hwp", "/out/a.pdf"));
+    await sendJobEvent({ kind: "completed", id: 1 });
+
+    act(() => result.current.clearFinished());
+    await sendJobEvent({ kind: "note", id: 1, message: "늦은 안내" });
+
+    expect(result.current.items).toHaveLength(0);
+  });
+
   it("언마운트하면 이벤트를 더 받지 않는다", async () => {
     const { result, unmount } = await renderQueue();
     act(() => result.current.track(1, "/tmp/a.hwp", "/out/a.pdf"));

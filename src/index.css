@@ -3,48 +3,89 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Phase 3(#design-tokens)에서 전용 디자인 토큰으로 교체한다. 지금은 shadcn 기본값. */
+/*
+ * 디자인 토큰 (#design-tokens)
+ *
+ * 방향: "차분한 유틸리티" — 매일 쓰는 로컬 도구. 화면의 주인공은 장식이 아니라
+ * 사용자의 파일이므로, 중성색은 아주 낮은 채도의 차가운 회색으로 깔고 색은
+ * 상태(진행·완료·실패)에만 쓴다. 색이 곧 정보라는 규칙을 깨지 않는다.
+ *
+ * 다크는 OS 설정을 따른다 (아직 테마 토글이 없다 — #shell-settings 에서 붙인다).
+ */
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+
+  /* 중성 — hue 250 의 아주 낮은 채도. 완전 무채색보다 종이/화면 느낌이 산다. */
+  --background: oklch(0.99 0.002 250);
+  --foreground: oklch(0.22 0.012 250);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: var(--foreground);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --popover-foreground: var(--foreground);
+  --muted: oklch(0.965 0.004 250);
+  --muted-foreground: oklch(0.5 0.014 250);
+  --border: oklch(0.9 0.006 250);
+  --input: oklch(0.9 0.006 250);
+
+  --primary: oklch(0.28 0.02 255);
+  --primary-foreground: oklch(0.99 0.002 250);
+  --secondary: oklch(0.965 0.004 250);
+  --secondary-foreground: var(--primary);
+  --accent: oklch(0.955 0.012 255);
+  --accent-foreground: var(--primary);
+
+  /* 상태색 — 본문 위에서 AA(4.5:1)를 넘기는 명도로 잡았다. */
+  --accent-strong: oklch(0.52 0.15 258);
+  --success: oklch(0.5 0.12 155);
+  --destructive: oklch(0.53 0.2 27);
+  --ring: oklch(0.52 0.15 258);
+
+  /* 깊이 — 두 단계면 충분하다. 그림자를 남발하면 목록이 울퉁불퉁해진다. */
+  --shadow-raised: 0 1px 2px oklch(0.22 0.012 250 / 6%);
+  --shadow-overlay:
+    0 8px 24px oklch(0.22 0.012 250 / 10%), 0 2px 6px oklch(0.22 0.012 250 / 6%);
+
+  /* 모션 — 상태 변화를 따라갈 수 있을 만큼만. */
+  --motion-fast: 120ms;
+  --motion-normal: 200ms;
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* 한글 최적화 서체 스택. 번들 폰트를 받지 않고 OS 기본 한글 서체를 우선한다
+     (설치 용량과 오프라인 원칙을 지키면서 각 OS 에서 가장 자연스럽다). */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Pretendard Variable", Pretendard,
+    "Apple SD Gothic Neo", "Segoe UI Variable Text", "Segoe UI",
+    "Malgun Gothic", "Noto Sans KR", sans-serif;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: oklch(0.185 0.01 255);
+    --foreground: oklch(0.95 0.004 250);
+    --card: oklch(0.225 0.012 255);
+    --popover: oklch(0.225 0.012 255);
+    --muted: oklch(0.265 0.012 255);
+    --muted-foreground: oklch(0.72 0.012 250);
+    --border: oklch(1 0 0 / 12%);
+    --input: oklch(1 0 0 / 16%);
+
+    --primary: oklch(0.93 0.006 250);
+    --primary-foreground: oklch(0.225 0.012 255);
+    --secondary: oklch(0.28 0.014 255);
+    --secondary-foreground: oklch(0.95 0.004 250);
+    --accent: oklch(0.3 0.02 258);
+    --accent-foreground: oklch(0.95 0.004 250);
+
+    /* 어두운 배경에서는 같은 색이 가라앉는다 — 명도를 올려 대비를 유지한다. */
+    --accent-strong: oklch(0.76 0.13 258);
+    --success: oklch(0.76 0.14 155);
+    --destructive: oklch(0.71 0.17 25);
+    --ring: oklch(0.76 0.13 258);
+
+    --shadow-raised: 0 1px 2px oklch(0 0 0 / 30%);
+    --shadow-overlay:
+      0 8px 24px oklch(0 0 0 / 45%), 0 2px 6px oklch(0 0 0 / 30%);
+  }
 }
 
 @theme inline {
@@ -52,6 +93,7 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -66,17 +108,44 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-strong: var(--accent-strong);
+  --color-success: var(--success);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  --shadow-raised: var(--shadow-raised);
+  --shadow-overlay: var(--shadow-overlay);
+
+  --font-sans: var(--font-sans);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    /* 한글 본문은 자간을 조금 좁혀야 덜 성기게 보인다. */
+    letter-spacing: -0.01em;
+  }
+
+  /* 숫자가 바뀌며 열이 흔들리지 않게 (진행률·용량·버전). */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 모션 최소화 설정을 존중한다 (#motion-polish). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

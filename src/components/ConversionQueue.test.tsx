@@ -1,11 +1,15 @@
 import { render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mockTauri, resetTauriMocks } from "@/test/tauri";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mockTauri, resetTauriMocks, type IpcCall } from "@/test/tauri";
 import type { ConversionItem } from "@/hooks/useConversionQueue";
 import { ConversionQueue } from "./ConversionQueue";
 
+let calls: IpcCall[];
+
 beforeEach(() => {
-  mockTauri();
+  calls = [];
+  mockTauri(() => undefined, calls);
 });
 
 afterEach(() => {
@@ -90,5 +94,96 @@ describe("ConversionQueue", () => {
 
     expect(screen.getByText("배포용 문서입니다.")).toBeInTheDocument();
     expect(screen.getByText("변환에 실패했습니다.")).toBeInTheDocument();
+  });
+});
+
+describe("ConversionQueue — 조작", () => {
+  // ── 취소 ─────────────────────────────────────────────────────
+
+  it("변환 중인 항목은 취소할 수 있다", async () => {
+    // 취소 커맨드는 진작 있었는데 화면에 붙어 있지 않아 아무도 쓸 수 없었다.
+    render(
+      <ConversionQueue items={[item({ status: "running", progress: 40 })]} />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "변환 취소" }));
+
+    expect(calls.map((call) => call.command)).toContain("cancel_job");
+    expect(
+      calls.find((call) => call.command === "cancel_job")?.payload,
+    ).toMatchObject({ id: 1 });
+  });
+
+  it("이미 끝난 항목에는 취소 버튼이 없다", () => {
+    render(<ConversionQueue items={[item({ status: "completed" })]} />);
+
+    expect(
+      screen.queryByRole("button", { name: "변환 취소" }),
+    ).not.toBeInTheDocument();
+  });
+
+  // ── 결과 열기 ────────────────────────────────────────────────
+
+  it("완료된 항목은 결과 PDF 를 바로 열 수 있다", async () => {
+    // 저장 위치만 열어 주면 사용자가 파일을 또 찾아야 한다.
+    render(<ConversionQueue items={[item({ status: "completed" })]} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "PDF 열기" }));
+
+    const opener = calls.find((call) => call.command.includes("opener"));
+    expect(JSON.stringify(opener?.payload)).toContain("/out/보고서.pdf");
+  });
+
+  // ── 진행 표시 ────────────────────────────────────────────────
+
+  it("진행률은 숫자와 막대로 함께 보인다", () => {
+    // 대용량 변환은 몇 분씩 걸린다 — 숫자만으로는 살아있는지 알기 어렵다.
+    render(
+      <ConversionQueue items={[item({ status: "running", progress: 42 })]} />,
+    );
+
+    const bar = screen.getByRole("progressbar");
+    expect(bar).toHaveAttribute("aria-valuenow", "42");
+    expect(screen.getByText(/42%/)).toBeInTheDocument();
+  });
+
+  it("끝난 항목에는 진행 막대를 남기지 않는다", () => {
+    render(<ConversionQueue items={[item({ status: "completed" })]} />);
+
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  // ── 목록 정리 ────────────────────────────────────────────────
+
+  it("끝난 항목이 있으면 목록을 정리할 수 있다", async () => {
+    const onClearFinished = vi.fn();
+    render(
+      <ConversionQueue
+        items={[
+          item({ id: 1, status: "completed" }),
+          item({ id: 2, status: "running" }),
+        ]}
+        onClearFinished={onClearFinished}
+      />,
+    );
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "끝난 항목 지우기" }),
+    );
+
+    expect(onClearFinished).toHaveBeenCalledOnce();
+  });
+
+  it("진행 중인 항목만 있으면 정리 버튼을 보이지 않는다", () => {
+    render(
+      <ConversionQueue
+        items={[item({ status: "running" })]}
+        onClearFinished={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: "끝난 항목 지우기" }),
+    ).not.toBeInTheDocument();
   });
 });

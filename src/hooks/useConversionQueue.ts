@@ -19,12 +19,22 @@ export interface ConversionItem {
 
 const PROGRESS_MAX = 100;
 
-/** 더 이상 진행률을 받지 않는 상태 — 늦게 온 추정치가 결과를 되돌리면 안 된다. */
-const SETTLED_STATUSES: readonly ConversionStatus[] = [
-  "cancelling",
+/** 더 이상 변하지 않는 종료 상태. */
+const FINISHED_STATUSES: readonly ConversionStatus[] = [
   "cancelled",
   "completed",
   "failed",
+];
+
+/**
+ * 더 이상 진행률을 받지 않는 상태 — 늦게 온 추정치가 결과를 되돌리면 안 된다.
+ *
+ * 취소 중은 아직 끝난 게 아니지만(정리 대상이 아니다) 진행률은 받지 않는다:
+ * 막대가 다시 오르면 취소가 씹힌 것처럼 보인다.
+ */
+const SETTLED_STATUSES: readonly ConversionStatus[] = [
+  "cancelling",
+  ...FINISHED_STATUSES,
 ];
 
 /** 경로 구분자는 OS 마다 다르다 — 둘 다 끊는다. */
@@ -68,6 +78,13 @@ export function useConversionQueue() {
   /// 커맨드가 id 를 돌려주기 전에 도착한 이벤트를 잠시 담아 둔다 —
   /// 즉시 실패하는 변환(암호 문서 등)은 등록보다 이벤트가 먼저 온다.
   const pendingRef = useRef<Map<JobId, JobEvent[]>>(new Map());
+
+  /** 끝난 항목만 목록에서 치운다 — 진행 중인 변환은 결과를 봐야 하므로 남긴다. */
+  const clearFinished = useCallback(() => {
+    setItems((current) =>
+      current.filter((item) => !FINISHED_STATUSES.includes(item.status)),
+    );
+  }, []);
 
   const track = useCallback((id: JobId, source: string, outPath: string) => {
     const buffered = pendingRef.current.get(id) ?? [];
@@ -117,5 +134,5 @@ export function useConversionQueue() {
     };
   }, []);
 
-  return { items, track };
+  return { items, track, clearFinished };
 }
