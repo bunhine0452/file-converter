@@ -163,7 +163,13 @@ pub fn convert_hwp(
         }
 
         match runtime.convert_to_pdf(&input, std::path::Path::new(&out_path)) {
-            Ok(()) => {
+            Ok(note) => {
+                // 안내는 완료보다 먼저 — 완료 이벤트를 보고 UI 가 항목을 접을 수 있다.
+                if let Some(note) = note {
+                    if let Err(error) = reporter.note(id, note) {
+                        eprintln!("안내 보고 실패: {error}");
+                    }
+                }
                 if let Err(error) = reporter.complete(id) {
                     eprintln!("완료 처리 실패: {error}");
                 }

@@ -78,7 +78,12 @@ fn main() {
             let output = Path::new(args.get(2).expect("출력 파일 경로가 필요합니다"));
 
             match manager.convert_to_pdf(input, output) {
-                Ok(()) => println!("변환 성공 → {}", output.display()),
+                Ok(note) => {
+                    println!("변환 성공 → {}", output.display());
+                    if let Some(note) = note {
+                        println!("안내: {note}");
+                    }
+                }
                 Err(message) => println!("변환 실패: {message}"),
             }
         }

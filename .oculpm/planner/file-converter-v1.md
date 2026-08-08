@@ -131,4 +131,5 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
 | 2026-08-07T19:29:21+09:00 | #lo-download | claude-code | ~→x | .oculpm/journal/20260807/Bugs/1929_bug_h2orestart-verify-scope-mismatch.md | 실환경 설치 완주·멱등 확인 (dmg 297MB + JRE 48MB) |
 | 2026-08-07T19:29:28+09:00 | #hwp-happy | claude-code | ☐→~ | .oculpm/journal/20260807/Bugs/1929_bug_h2orestart-verify-scope-mismatch.md | 실물 .hwp→PDF 7쪽 성공(육안 대조 OK) — 앱 창 드래그&드롭만 남음 |
 | 2026-08-07T19:29:34+09:00 | #hwpx-happy | claude-code | ☐→~ | .oculpm/journal/20260807/Bugs/1929_bug_h2orestart-verify-scope-mismatch.md | 실물 .hwpx→PDF 27쪽 성공 — 앱 창 드래그&드롭만 남음 |
+| 2026-08-07T20:22:25+09:00 | #hwp-errors | claude-code | ~→~ | .oculpm/journal/20260807/Bugs/2022_bug_preflight-note-dropped-before-ui.md | 배포용·HWPX암호화 안내가 코어→이벤트→UI로 연결됨(TDD). 실샘플 손검증 남음 |
 <!-- oculpm:plan-log end -->

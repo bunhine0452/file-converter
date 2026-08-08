@@ -45,6 +45,7 @@ describe("useConversionQueue", () => {
         status: "queued",
         progress: 0,
         message: null,
+        note: null,
       },
     ]);
   });
@@ -134,6 +135,57 @@ describe("useConversionQueue", () => {
     );
 
     expect(result.current.items[0].name).toBe("보고서.v2.hwp");
+  });
+
+  // ── 프리플라이트 안내 ────────────────────────────────────────
+
+  it("안내 이벤트가 항목에 남는다", async () => {
+    const { result } = await renderQueue();
+    act(() => result.current.track(1, "/tmp/배포용.hwp", "/out/배포용.pdf"));
+
+    await sendJobEvent({
+      kind: "note",
+      id: 1,
+      message: "배포용(읽기 전용) 한글 문서입니다.",
+    });
+
+    expect(result.current.items[0].note).toBe(
+      "배포용(읽기 전용) 한글 문서입니다.",
+    );
+  });
+
+  it("안내는 상태나 진행률을 바꾸지 않는다", async () => {
+    const { result } = await renderQueue();
+    act(() => result.current.track(1, "/tmp/a.hwp", "/out/a.pdf"));
+    await sendJobEvent({ kind: "progress", id: 1, progress: 5 });
+
+    await sendJobEvent({ kind: "note", id: 1, message: "안내" });
+
+    // 안내를 실패처럼 보이게 하면 사용자는 변환이 멈춘 줄 안다.
+    expect(result.current.items[0].status).toBe("running");
+    expect(result.current.items[0].progress).toBe(5);
+    expect(result.current.items[0].message).toBeNull();
+  });
+
+  it("완료된 뒤에도 안내가 남는다", async () => {
+    // 완료가 안내를 지워버리면 경고를 볼 기회가 사라진다.
+    const { result } = await renderQueue();
+    act(() => result.current.track(1, "/tmp/배포용.hwp", "/out/배포용.pdf"));
+
+    await sendJobEvent({ kind: "note", id: 1, message: "안내" });
+    await sendJobEvent({ kind: "completed", id: 1 });
+
+    expect(result.current.items[0].status).toBe("completed");
+    expect(result.current.items[0].note).toBe("안내");
+  });
+
+  it("등록보다 먼저 온 안내도 반영된다", async () => {
+    const { result } = await renderQueue();
+
+    await sendJobEvent({ kind: "note", id: 7, message: "안내" });
+    act(() => result.current.track(7, "/tmp/배포용.hwp", "/out/배포용.pdf"));
+
+    expect(result.current.items[0].note).toBe("안내");
   });
 
   it("언마운트하면 이벤트를 더 받지 않는다", async () => {

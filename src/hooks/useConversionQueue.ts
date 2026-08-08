@@ -13,6 +13,8 @@ export interface ConversionItem {
   status: ConversionStatus;
   progress: number;
   message: string | null;
+  /** 변환을 막지는 않지만 결과물이 원본과 다를 수 있다는 안내 (배포용 문서 등). */
+  note: string | null;
 }
 
 const PROGRESS_MAX = 100;
@@ -32,6 +34,9 @@ function applyEvent(item: ConversionItem, event: JobEvent): ConversionItem {
       return { ...item, status: "completed", progress: PROGRESS_MAX };
     case "failed":
       return { ...item, status: "failed", message: event.message };
+    // 안내는 통지일 뿐 — 상태·진행률을 건드리지 않고 완료 후에도 남는다.
+    case "note":
+      return { ...item, note: event.message };
     case "cancelling":
       return { ...item, status: "cancelling" };
     case "cancelled":
@@ -66,6 +71,7 @@ export function useConversionQueue() {
       status: "queued",
       progress: 0,
       message: null,
+      note: null,
     };
 
     setItems((current) => [...current, buffered.reduce(applyEvent, initial)]);

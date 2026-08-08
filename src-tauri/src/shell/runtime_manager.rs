@@ -454,11 +454,19 @@ impl RuntimeManager {
     }
 
     /// 한 건 변환. 프리플라이트 → soffice → 판정 → 산출물 이동 순서를 지킨다.
-    pub fn convert_to_pdf(&self, input: &Path, out_path: &Path) -> Result<(), String> {
-        match preflight_file(input).map_err(|e| e.to_string())? {
+    ///
+    /// 성공 시 돌려주는 값은 사용자에게 함께 보여줄 안내다 (배포용 문서 등).
+    /// 변환을 막지는 않지만 결과물이 원본과 다를 수 있음을 알려야 한다.
+    pub fn convert_to_pdf(
+        &self,
+        input: &Path,
+        out_path: &Path,
+    ) -> Result<Option<&'static str>, String> {
+        let note = match preflight_file(input).map_err(|e| e.to_string())? {
             Preflight::Reject(reason) => return Err(reject_message(reason).to_string()),
-            Preflight::Proceed | Preflight::ProceedWithNote(_) => {}
-        }
+            Preflight::ProceedWithNote(note) => Some(note),
+            Preflight::Proceed => None,
+        };
 
         let soffice = self
             .soffice()?
@@ -496,7 +504,7 @@ impl RuntimeManager {
         let result = self.finish_conversion(outcome, &plan.expected_output(), out_path);
         let _ = self.fs.remove_dir_all(&out_dir);
 
-        result
+        result.map(|()| note)
     }
 
     fn finish_conversion(
@@ -574,10 +582,12 @@ pub fn jre_folder_name() -> String {
 mod tests {
     use super::*;
     use crate::core::fs_port::fake::FakeFs;
+    use crate::core::hwp::preflight::{RejectReason, NOTE_DISTRIBUTABLE};
     use crate::core::runtime::assets::{Arch, Os};
     use crate::core::runtime::download::fake::FakeDownloader;
     use crate::core::soffice::probe::fake::FakeProbe;
     use crate::core::soffice::runner::fake::{ok_output, FakeRunner};
+    use crate::core::soffice::runner::ProcessRequest;
 
     fn platform(os: Os) -> Platform {
         Platform {
@@ -767,5 +777,139 @@ mod tests {
 
         assert_eq!(json["kind"], "progress");
         assert_eq!(json["received"], 10);
+    }
+
+    // ── 변환 안내 전달 ────────────────────────────────────────────
+
+    /// 플래그 바이트만 다른 최소 HWP5 문서를 실제 디스크에 만든다.
+    ///
+    /// 프리플라이트는 fs 포트가 아니라 실제 파일을 연다 — 여기서만 진짜 디스크를 쓴다.
+    fn write_hwp5(path: &Path, flag_byte_36: u8) {
+        use std::io::Write;
+
+        let mut header = vec![0u8; 48];
+        header[..17].copy_from_slice(b"HWP Document File");
+        header[32..36].copy_from_slice(&[0, 5, 0, 5]); // 5.0.5.0 (역순 저장)
+        header[36] = flag_byte_36;
+
+        let mut compound =
+            cfb::CompoundFile::create(std::io::Cursor::new(Vec::new())).expect("복합문서 생성");
+        let mut stream = compound.create_stream("/FileHeader").expect("스트림 생성");
+        stream.write_all(&header).expect("헤더 기록");
+        drop(stream);
+
+        std::fs::write(path, compound.into_inner().into_inner()).expect("파일 기록");
+    }
+
+    fn real_temp_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "fc-convert-{tag}-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("시간")
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).expect("임시 디렉토리");
+        dir
+    }
+
+    /// 변환이 성공하는 매니저 — soffice 가 `--outdir` 에 PDF 를 떨군 것처럼 굴린다.
+    fn converting_manager() -> RuntimeManager {
+        let platform = Platform::host().expect("지원 플랫폼");
+        let base = std::env::temp_dir().join("fc-convert-manager-test");
+        let paths = RuntimePaths::new(&base, platform).expect("런타임 경로");
+
+        let soffice = paths.libreoffice.join("soffice");
+        let fs = Arc::new(FakeFs::new().with_file(unopkg_next_to(&soffice), b"bin".to_vec()));
+
+        let effect_fs = Arc::clone(&fs);
+        let runner = Arc::new(
+            FakeRunner::new()
+                .responding(soffice.clone(), ok_output(VERSION_STDOUT))
+                // 실제 soffice 는 --outdir 아래에 <입력 basename>.pdf 를 만든다.
+                .on_run(soffice.clone(), move |request: &ProcessRequest| {
+                    let args = &request.args;
+                    let Some(index) = args.iter().position(|arg| arg == "--outdir") else {
+                        return;
+                    };
+                    let (Some(out_dir), Some(input)) = (args.get(index + 1), args.last()) else {
+                        return;
+                    };
+                    let produced = Path::new(out_dir)
+                        .join(Path::new(input).file_name().expect("입력 파일명"))
+                        .with_extension("pdf");
+
+                    effect_fs.add_file(produced, b"%PDF-1.7\n...".to_vec());
+                }),
+        );
+
+        let probe = FakeProbe::new()
+            .user_override(soffice.clone())
+            .executable(soffice);
+
+        RuntimeManager::new(
+            Arc::new(probe),
+            runner,
+            fs,
+            Arc::new(FakeDownloader::new(Vec::new())),
+            Arc::new(UnusedInstaller),
+            paths,
+            platform,
+        )
+    }
+
+    #[test]
+    fn 배포용_문서를_변환하면_안내가_함께_돌아온다() {
+        // Arrange — 안내를 여기서 흘리면 사용자는 서식이 틀어진 PDF 를 말없이 받는다.
+        let dir = real_temp_dir("배포용");
+        let input = dir.join("배포용.hwp");
+        write_hwp5(&input, 0b0000_0100); // bit2 = distributable
+        let manager = converting_manager();
+
+        // Act
+        let note = manager
+            .convert_to_pdf(&input, Path::new("/out/배포용.pdf"))
+            .expect("변환 성공");
+
+        // Assert
+        assert_eq!(note, Some(NOTE_DISTRIBUTABLE));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn 평범한_문서는_안내_없이_변환된다() {
+        // Arrange
+        let dir = real_temp_dir("평범");
+        let input = dir.join("보고서.hwp");
+        write_hwp5(&input, 0b0000_0001); // compressed 만 켜짐
+        let manager = converting_manager();
+
+        // Act
+        let note = manager
+            .convert_to_pdf(&input, Path::new("/out/보고서.pdf"))
+            .expect("변환 성공");
+
+        // Assert — 경고를 남발하면 진짜 경고가 묻힌다.
+        assert_eq!(note, None);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn 암호_문서는_여전히_변환_전에_거부된다() {
+        // Arrange
+        let dir = real_temp_dir("암호");
+        let input = dir.join("암호.hwp");
+        write_hwp5(&input, 0b0000_0010); // bit1 = passwordEncrypted
+        let manager = converting_manager();
+
+        // Act
+        let result = manager.convert_to_pdf(&input, Path::new("/out/암호.pdf"));
+
+        // Assert — 거부는 안내가 아니라 실패로 남아야 한다.
+        assert_eq!(
+            result,
+            Err(reject_message(RejectReason::PasswordProtected).to_string())
+        );
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

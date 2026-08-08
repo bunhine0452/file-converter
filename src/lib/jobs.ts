@@ -12,6 +12,7 @@ export type JobEvent =
   | { kind: "progress"; id: JobId; progress: number }
   | { kind: "completed"; id: JobId }
   | { kind: "failed"; id: JobId; message: string }
+  | { kind: "note"; id: JobId; message: string }
   | { kind: "cancelling"; id: JobId }
   | { kind: "cancelled"; id: JobId };
 

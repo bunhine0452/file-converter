@@ -45,6 +45,13 @@ export function ConversionQueue({ items }: ConversionQueueProps) {
             </span>
           </div>
 
+          {/* 안내는 실패가 아니다 — 변환은 됐지만 결과가 원본과 다를 수 있다는 뜻이다. */}
+          {item.note && (
+            <p role="status" className="text-muted-foreground text-xs">
+              {item.note}
+            </p>
+          )}
+
           {item.message && (
             <p className="text-destructive text-xs">{item.message}</p>
           )}

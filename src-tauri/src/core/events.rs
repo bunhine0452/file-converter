@@ -23,6 +23,9 @@ pub enum JobEvent {
     Completed { id: JobId },
     #[serde(rename_all = "camelCase")]
     Failed { id: JobId, message: String },
+    /// 변환은 진행하되 사용자에게 함께 보여줄 안내 (프리플라이트 경고 등).
+    #[serde(rename_all = "camelCase")]
+    Note { id: JobId, message: String },
     #[serde(rename_all = "camelCase")]
     Cancelling { id: JobId },
     #[serde(rename_all = "camelCase")]
@@ -78,6 +81,19 @@ impl<S: EventSink> JobReporter<S> {
 
         self.queue.set_progress(id, progress)?;
         self.emit(&JobEvent::Progress { id, progress })
+    }
+
+    /// 진행을 막지 않는 안내를 알린다 — 상태도 진행률도 바꾸지 않는 순수 통지다.
+    pub fn note(&self, id: JobId, message: impl Into<String>) -> Result<(), ReportError> {
+        // 존재하지 않는 작업의 안내는 UI 가 붙일 곳이 없다.
+        if self.queue.get(id).is_none() {
+            return Err(JobError::NotFound(id).into());
+        }
+
+        self.emit(&JobEvent::Note {
+            id,
+            message: message.into(),
+        })
     }
 
     pub fn complete(&self, id: JobId) -> Result<(), ReportError> {
@@ -331,6 +347,91 @@ mod tests {
         assert_eq!(status, JobStatus::Cancelled);
         assert!(sink.events().contains(&JobEvent::Cancelled { id }));
         assert!(!sink.events().contains(&JobEvent::Cancelling { id }));
+    }
+
+    // ── 프리플라이트 안내 ─────────────────────────────────────────
+
+    #[test]
+    fn 안내를_보고하면_note_이벤트가_발행된다() {
+        // Arrange
+        let (reporter, sink) = reporter();
+        let id = reporter.enqueue(request()).expect("등록 성공");
+
+        // Act
+        reporter
+            .note(id, "배포용(읽기 전용) 한글 문서입니다.")
+            .expect("안내 보고");
+
+        // Assert
+        assert!(sink.events().contains(&JobEvent::Note {
+            id,
+            message: "배포용(읽기 전용) 한글 문서입니다.".to_string(),
+        }));
+    }
+
+    #[test]
+    fn 안내는_작업_상태나_진행률을_건드리지_않는다() {
+        // Arrange — 실행 중이고 진행률이 올라간 작업
+        let (reporter, _sink) = reporter();
+        let id = reporter.enqueue(request()).expect("등록 성공");
+        reporter.claim_next().expect("워커가 작업을 집음");
+        reporter.report_progress(id, 5).expect("진행률 보고");
+
+        // Act
+        reporter.note(id, "안내").expect("안내 보고");
+
+        // Assert — 안내는 순수 통지다. 상태를 바꾸면 UI 가 실패로 오해한다.
+        let job = &reporter.snapshot()[0];
+        assert_eq!(job.status, JobStatus::Running);
+        assert_eq!(job.progress, 5);
+    }
+
+    #[test]
+    fn 안내를_남긴_작업도_그대로_완료될_수_있다() {
+        // Arrange
+        let (reporter, sink) = reporter();
+        let id = reporter.enqueue(request()).expect("등록 성공");
+        reporter.claim_next().expect("워커가 작업을 집음");
+
+        // Act
+        reporter.note(id, "안내").expect("안내 보고");
+        reporter.complete(id).expect("완료 처리");
+
+        // Assert
+        assert!(sink.events().contains(&JobEvent::Completed { id }));
+        assert_eq!(reporter.snapshot()[0].status, JobStatus::Completed);
+    }
+
+    #[test]
+    fn 모르는_id_에_안내를_보고하면_에러이고_이벤트를_남기지_않는다() {
+        // Arrange
+        let (reporter, sink) = reporter();
+
+        // Act
+        let result = reporter.note(999, "안내");
+
+        // Assert
+        assert!(matches!(
+            result,
+            Err(ReportError::Job(JobError::NotFound(999)))
+        ));
+        assert!(sink.events().is_empty());
+    }
+
+    #[test]
+    fn note_이벤트도_kind_태그로_직렬화된다() {
+        // Arrange & Act
+        let json = serde_json::to_value(JobEvent::Note {
+            id: 3,
+            message: "안내".to_string(),
+        })
+        .expect("직렬화 성공");
+
+        // Assert
+        assert_eq!(
+            json,
+            serde_json::json!({ "kind": "note", "id": 3, "message": "안내" })
+        );
     }
 
     #[test]

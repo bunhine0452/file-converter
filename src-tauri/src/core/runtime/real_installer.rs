@@ -219,7 +219,7 @@ mod tests {
             FakeRunner::new()
                 .responding("hdiutil", ok_output(&attach_plist()))
                 // 실제 ditto 는 번들을 복사해 실행 파일을 만들어낸다.
-                .on_run("ditto", move || {
+                .on_run("ditto", move |_| {
                     created.add_file(
                         format!("{DEST}/LibreOffice.app/Contents/MacOS/soffice"),
                         b"bin".to_vec(),

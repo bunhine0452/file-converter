@@ -124,7 +124,8 @@ pub mod fake {
     use std::collections::BTreeMap;
     use std::sync::Mutex;
 
-    type Effect = Box<dyn Fn() + Send + Sync>;
+    /// 실제 도구의 부작용을 흉내내는 훅. 요청을 받아야 `--outdir` 같은 인자를 볼 수 있다.
+    type Effect = Box<dyn Fn(&ProcessRequest) + Send + Sync>;
 
     #[derive(Default)]
     pub struct FakeRunner {
@@ -158,7 +159,7 @@ pub mod fake {
         pub fn on_run(
             self,
             program: impl Into<PathBuf>,
-            effect: impl Fn() + Send + Sync + 'static,
+            effect: impl Fn(&ProcessRequest) + Send + Sync + 'static,
         ) -> Self {
             self.effects
                 .lock()
@@ -181,7 +182,7 @@ pub mod fake {
             self.calls.lock().unwrap().push(request.clone());
 
             if let Some(effect) = self.effects.lock().unwrap().get(&request.program) {
-                effect();
+                effect(request);
             }
 
             if let Some(output) = self.responses.lock().unwrap().get(&request.program) {
