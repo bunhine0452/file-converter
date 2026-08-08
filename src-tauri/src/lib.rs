@@ -3,7 +3,9 @@ pub mod shell;
 
 use tauri::Manager;
 
-use shell::commands::{cancel_job, convert_hwp, get_runtime_status, install_runtime, list_jobs};
+use shell::commands::{
+    cancel_job, convert_hwp, get_runtime_status, install_runtime, list_jobs, plan_output_path,
+};
 use shell::{event_sink::TauriEventSink, AppState};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -23,6 +25,7 @@ pub fn run() {
             list_jobs,
             get_runtime_status,
             install_runtime,
+            plan_output_path,
             convert_hwp
         ])
         .run(tauri::generate_context!())

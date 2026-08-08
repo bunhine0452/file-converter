@@ -21,6 +21,10 @@ function respondNormally(savePath: string | null = "/out/계약서.pdf") {
         return READY_STATUS;
       case "plugin:dialog|save":
         return savePath;
+      case "plugin:dialog|open":
+        return "/out";
+      case "plan_output_path":
+        return "/out/planned.pdf";
       case "convert_hwp":
         return 1;
       default:
@@ -91,6 +95,36 @@ describe("App", () => {
       await screen.findByRole("list", { name: "변환 목록" }),
     ).toBeInTheDocument();
     expect(screen.getByText("계약서.hwp")).toBeInTheDocument();
+  });
+
+  it("여러 파일을 드롭하면 폴더를 한 번만 묻는다", async () => {
+    // 파일마다 저장 대화상자를 띄우면 10개 드롭에 10번 답해야 한다.
+    await renderApp();
+
+    await drop(["/tmp/가.hwp", "/tmp/나.hwp", "/tmp/다.hwp"]);
+
+    await waitFor(() =>
+      expect(
+        calledCommands().filter((command) => command === "convert_hwp"),
+      ).toHaveLength(3),
+    );
+    expect(
+      calledCommands().filter((command) => command === "plugin:dialog|save"),
+    ).toHaveLength(0);
+    expect(
+      calledCommands().filter((command) => command === "plugin:dialog|open"),
+    ).toHaveLength(1);
+  });
+
+  it("일괄 저장 경로는 코어가 정한다 (덮어쓰기 방지)", async () => {
+    await renderApp();
+
+    await drop(["/tmp/가.hwp", "/tmp/나.hwp"]);
+
+    await waitFor(() => expect(calledCommands()).toContain("plan_output_path"));
+    expect(
+      calledCommands().filter((command) => command === "plan_output_path"),
+    ).toHaveLength(2);
   });
 
   // ── edge cases ───────────────────────────────────────────────

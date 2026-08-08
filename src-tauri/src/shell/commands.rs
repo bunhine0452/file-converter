@@ -8,7 +8,9 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::core::file_type::FileKind;
+use crate::core::fs_port::{FileSystem, RealFs};
 use crate::core::job::{JobId, JobRequest, JobStatus};
+use crate::core::output::{pdf_name_for, unique_output_path};
 use crate::core::progress::{heartbeat_percent, Heartbeat, CONVERT_STARTED_PERCENT};
 use crate::core::runtime::assets::H2O_VERSION;
 use crate::core::runtime::plan::{ExtensionState, RuntimeStatus};
@@ -135,6 +137,23 @@ pub async fn install_runtime(
     .map_err(|error| error.to_string())??;
 
     Ok(status)
+}
+
+/// 폴더 하나에 여러 건을 저장할 때 쓸 산출물 경로를 정한다.
+///
+/// 저장 대화상자로 사용자가 직접 고른 경로와 달리 여기서는 덮어쓰기 동의를 받은 적이
+/// 없다 — 같은 이름이 있으면 번호를 붙여 남의 파일을 지우지 않는다.
+#[tauri::command]
+pub fn plan_output_path(source: String, dir: String) -> Result<String, String> {
+    let source = PathBuf::from(source);
+    let dir = PathBuf::from(dir);
+    let fs = RealFs;
+
+    let path = unique_output_path(&dir, &pdf_name_for(&source), &|candidate| {
+        fs.exists(candidate)
+    });
+
+    Ok(path.to_string_lossy().into_owned())
 }
 
 /// HWP/HWPX 한 건을 PDF 로 변환한다. 진행 상황은 기존 작업 이벤트로 나간다.

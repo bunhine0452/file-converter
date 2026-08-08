@@ -20,9 +20,9 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
   - [x] git init + 초기 커밋 + gh로 퍼블릭 리포 생성·푸시가 완료된다 {#repo-init}
   - [x] MIT LICENSE, README 뼈대(프로젝트 소개·설치형 이유), .gitignore가 커밋된다 {#repo-license}
   - [x] THIRD-PARTY-NOTICES에 LibreOffice(MPL)·H2Orestart(GPL, 외부 프로세스)·FFmpeg(LGPL)·PDFium 고지 초안이 들어간다 {#repo-notice}
-- [~] CI 빌드 파이프라인이 그린이다 {#ci-pipeline}
+- [x] CI 빌드 파이프라인이 그린이다 {#ci-pipeline}
   - [x] GitHub Actions에서 lint+Vitest+cargo test가 PR마다 실행된다 {#ci-test}
-  - [~] mac(aarch64)/win(x64) tauri 빌드 매트릭스가 아티팩트(dmg/nsis)를 생성한다 {#ci-build}
+  - [x] mac(aarch64)/win(x64) tauri 빌드 매트릭스가 아티팩트(dmg/nsis)를 생성한다 {#ci-build}
 - [x] 변환 코어 골격 (작업 큐·타입 감지·진행 이벤트) {#core-skeleton}
   - [x] Rust 변환 작업 큐(등록/취소/상태)가 단위 테스트로 검증된다 {#core-job-queue}
   - [x] 확장자+매직 바이트 파일 타입 감지가 hwp/hwpx/png/jpg/pdf 샘플로 테스트 통과한다 {#core-detect}
@@ -46,18 +46,18 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
   - [~] 완료 시 저장 위치 열기/파일 열기 액션이 mac/win에서 동작한다 {#output-open}
 
 ## Phase 3 — 디자인 시스템·앱 셸 (고급스럽고 편안한 UX) {#ph3-design}
-- [ ] 디자인 토큰·테마 체계 {#design-tokens}
-  - [ ] 색·타이포·여백·라운드·그림자·모션 토큰이 Tailwind v4 @theme으로 정의된다 (light/dark) {#tokens-define}
-  - [ ] shadcn/ui 컴포넌트가 전용 토큰을 상속해 기본 룩과 구분되는 룩을 갖는다 {#tokens-shadcn}
-  - [ ] 한글 최적화 서체 스택(Pretendard 등)과 고정폭 숫자(tabular figures) 설정이 적용된다 {#tokens-typography}
-- [ ] 앱 셸 레이아웃 {#app-shell}
-  - [ ] 변환 카테고리(문서/이미지/PDF/미디어) 사이드바와 메인 큐 화면 레이아웃이 완성된다 {#shell-nav}
+- [x] 디자인 토큰·테마 체계 {#design-tokens}
+  - [x] 색·타이포·여백·라운드·그림자·모션 토큰이 Tailwind v4 @theme으로 정의된다 (light/dark) {#tokens-define}
+  - [x] shadcn/ui 컴포넌트가 전용 토큰을 상속해 기본 룩과 구분되는 룩을 갖는다 {#tokens-shadcn}
+  - [x] 한글 최적화 서체 스택(Pretendard 등)과 고정폭 숫자(tabular figures) 설정이 적용된다 {#tokens-typography}
+- [~] 앱 셸 레이아웃 {#app-shell}
+  - [x] 변환 카테고리(문서/이미지/PDF/미디어) 사이드바와 메인 큐 화면 레이아웃이 완성된다 {#shell-nav}
   - [ ] 설정 화면(출력 폴더·이름 규칙·테마·LibreOffice 상태)이 동작한다 {#shell-settings}
   - [ ] 네이티브 타이틀바/윈도 컨트롤이 mac/win 각각 자연스럽게 통합된다 {#shell-window}
-- [ ] 디자인 품질·접근성 게이트 {#design-quality}
-  - [ ] 키보드만으로 파일 선택→변환→결과 열기가 가능하다 {#a11y-keyboard}
-  - [ ] 라이트/다크 모두 WCAG AA 대비를 통과한다 {#a11y-contrast}
-  - [ ] 드롭·진행·완료 마이크로 인터랙션이 reduced-motion 설정을 존중한다 {#motion-polish}
+- [~] 디자인 품질·접근성 게이트 {#design-quality}
+  - [~] 키보드만으로 파일 선택→변환→결과 열기가 가능하다 {#a11y-keyboard}
+  - [x] 라이트/다크 모두 WCAG AA 대비를 통과한다 {#a11y-contrast}
+  - [x] 드롭·진행·완료 마이크로 인터랙션이 reduced-motion 설정을 존중한다 {#motion-polish}
 
 ## Phase 4 — 이미지 변환 {#ph4-images}
 - [ ] 이미지 변환 엔진 (Rust) {#img-engine}
@@ -135,4 +135,12 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
 | 2026-08-08T20:40:50+09:00 | #hwp-large | claude-code | ☐→x | .oculpm/journal/20260808/Features_to_add/2040_feature_large-doc-progress-heartbeat.md | 105MB/1621쪽 105.9s 성공 · 1초 하트비트로 5%→34% 갱신 · 상태조회 메인스레드 차단 제거 |
 | 2026-08-08T20:40:58+09:00 | #lo-h2o | claude-code | x→x | .oculpm/journal/20260808/Bugs/2040_bug_extension-query-scope-too-narrow.md | 번들-only 조회 회귀 수정 — 두 스코프 병합. 실환경 Registered 0.7.13 복귀 |
 | 2026-08-08T20:45:31+09:00 | #hwp-errors | claude-code | ~→x | .oculpm/journal/20260808/Bugs/2045_bug_leaky-inspect-error-messages.md | 실물 .hwp 변형 4종 검증 — 배포용/암호/잘림/가짜 모두 한국어 안내. 진짜 암호화 문서만 미확인 |
+| 2026-08-08T21:07:18+09:00 | #ci-build | claude-code | ~→x | .oculpm/journal/20260808/Chores/2107_chore_verify-build-matrix-artifacts.md | 수동 실행 9분23초 · dmg 4MB · nsis 3MB 아티팩트 확인 |
+| 2026-08-08T21:07:29+09:00 | #tokens-define | claude-code | ☐→x | .oculpm/journal/20260808/Features_to_add/2106_feature_design-tokens-app-shell-queue-actions.md | 차분한 유틸리티 방향 · 상태색/깊이2단계/모션 토큰 · 다크는 OS 설정 |
+| 2026-08-08T21:07:38+09:00 | #tokens-typography | claude-code | ☐→x | .oculpm/journal/20260808/Features_to_add/2106_feature_design-tokens-app-shell-queue-actions.md | OS 기본 한글 서체 우선(번들 없음) · 자간 -0.01em · tabular figures |
+| 2026-08-08T21:07:47+09:00 | #tokens-shadcn | claude-code | ☐→x | .oculpm/journal/20260808/Features_to_add/2106_feature_design-tokens-app-shell-queue-actions.md | shadcn 기본 무채색을 전용 토큰(차가운 중성+상태색)으로 교체 |
+| 2026-08-08T21:07:56+09:00 | #shell-nav | claude-code | ☐→x | .oculpm/journal/20260808/Features_to_add/2106_feature_design-tokens-app-shell-queue-actions.md | 사이드바 4분류 + 메인 큐 · 미구현 분류는 준비 중 비활성(탭 순서 제외) |
+| 2026-08-08T21:08:06+09:00 | #a11y-contrast | claude-code | ☐→x | .oculpm/journal/20260808/Features_to_add/2106_feature_design-tokens-app-shell-queue-actions.md | 토큰을 CSS 에서 직접 읽어 라이트/다크 10쌍 AA 검사(최저 5.59:1) — 테스트로 고정 |
+| 2026-08-08T21:08:17+09:00 | #motion-polish | claude-code | ☐→x | .oculpm/journal/20260808/Features_to_add/2106_feature_design-tokens-app-shell-queue-actions.md | 전역 prefers-reduced-motion 차단 + motion-reduce 유틸 · 모션 토큰 정의 |
+| 2026-08-08T21:08:26+09:00 | #a11y-keyboard | claude-code | ☐→~ | .oculpm/journal/20260808/Features_to_add/2106_feature_design-tokens-app-shell-queue-actions.md | 파일 선택·취소·PDF 열기 모두 버튼으로 도달 가능. 실제 앱 창에서 탭 이동 확인 남음 |
 <!-- oculpm:plan-log end -->

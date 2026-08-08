@@ -1,11 +1,11 @@
 import { useCallback, useState } from "react";
-import { save } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { CategoryNav, type ConversionCategory } from "@/components/CategoryNav";
 import { ConversionQueue } from "@/components/ConversionQueue";
 import { Dropzone } from "@/components/Dropzone";
 import { RuntimeStatus } from "@/components/RuntimeStatus";
 import { useConversionQueue } from "@/hooks/useConversionQueue";
-import { convertHwp } from "@/lib/runtime";
+import { convertHwp, planOutputPath } from "@/lib/runtime";
 
 /** `.hwp` / `.hwpx` 를 `.pdf` 로 바꾼 기본 저장 이름. */
 function defaultOutputPath(source: string): string {
@@ -16,23 +16,51 @@ function App() {
   const { items, track, clearFinished } = useConversionQueue();
   const [category, setCategory] = useState<ConversionCategory>("document");
 
+  const startOne = useCallback(
+    async (source: string, outPath: string) => {
+      const id = await convertHwp(source, outPath);
+      track(id, source, outPath);
+    },
+    [track],
+  );
+
+  /**
+   * 한 건은 저장 위치를 묻고, 여러 건은 폴더를 **한 번만** 묻는다.
+   *
+   * 파일마다 대화상자를 띄우면 10개를 드롭한 사용자는 10번 답해야 한다.
+   * 폴더 저장은 덮어쓰기 동의를 받은 적이 없으므로 이름은 코어가 겹치지 않게 정한다.
+   */
   const handleFiles = useCallback(
     async (paths: string[]) => {
-      for (const source of paths) {
+      if (paths.length === 0) return;
+
+      if (paths.length === 1) {
         const outPath = await save({
           title: "PDF 저장 위치",
-          defaultPath: defaultOutputPath(source),
+          defaultPath: defaultOutputPath(paths[0]),
           filters: [{ name: "PDF 문서", extensions: ["pdf"] }],
         });
 
-        // 사용자가 취소하면 이 파일은 건너뛴다.
-        if (outPath === null) continue;
+        // 사용자가 취소하면 변환하지 않는다.
+        if (outPath === null) return;
 
-        const id = await convertHwp(source, outPath);
-        track(id, source, outPath);
+        await startOne(paths[0], outPath);
+        return;
+      }
+
+      const dir = await open({
+        title: `PDF ${paths.length}개를 저장할 폴더`,
+        directory: true,
+        multiple: false,
+      });
+
+      if (dir === null) return;
+
+      for (const source of paths) {
+        await startOne(source, await planOutputPath(source, dir));
       }
     },
-    [track],
+    [startOne],
   );
 
   return (

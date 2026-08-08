@@ -5,6 +5,7 @@ pub mod file_type;
 pub mod fs_port;
 pub mod hwp;
 pub mod job;
+pub mod output;
 pub mod progress;
 pub mod runtime;
 pub mod soffice;

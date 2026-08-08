@@ -40,6 +40,16 @@ export function convertHwp(source: string, outPath: string): Promise<number> {
   return invoke<number>("convert_hwp", { source, outPath });
 }
 
+/**
+ * 폴더 하나에 여러 건을 저장할 때 쓸 경로를 코어에서 받아온다.
+ *
+ * 이름이 겹치면 코어가 번호를 붙인다 — 폴더만 고른 일괄 변환에서는
+ * 사용자가 덮어쓰기에 동의한 적이 없다.
+ */
+export function planOutputPath(source: string, dir: string): Promise<string> {
+  return invoke<string>("plan_output_path", { source, dir });
+}
+
 /** 상태별 사용자 대면 문구. `unsupported` 를 빼먹지 않도록 전부 채워 둔다. */
 export const RUNTIME_STATE_MESSAGE: Record<RuntimeState, string> = {
   ready: "변환 준비가 끝났습니다",
