@@ -143,6 +143,11 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* macOS 투명 타이틀바(신호등 버튼) 자리. 다른 OS 는 시스템 타이틀바를 쓰므로 비우지 않는다. */
+  :root[data-platform="mac"] .titlebar-inset {
+    padding-top: 1.75rem;
+  }
+
   /* 모션 최소화 설정을 존중한다 (#motion-polish). */
   @media (prefers-reduced-motion: reduce) {
     *,

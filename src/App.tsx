@@ -107,8 +107,9 @@ function App() {
   return (
     <div className="grid min-h-svh grid-cols-1 sm:grid-cols-[13.5rem_1fr]">
       {/* 사이드바 — 좁은 창에서는 위쪽 가로 목록으로 접힌다. */}
-      <aside className="bg-muted/40 flex flex-col gap-4 border-b p-4 sm:border-r sm:border-b-0 sm:p-5">
-        <div className="flex flex-col gap-0.5">
+      <aside className="bg-muted/40 titlebar-inset flex flex-col gap-4 border-b p-4 sm:border-r sm:border-b-0 sm:p-5">
+        {/* 타이틀바를 숨긴 macOS 에서도 이 영역을 잡아 창을 옮길 수 있다. */}
+        <div data-tauri-drag-region className="flex flex-col gap-0.5">
           <h1 className="text-sm font-semibold tracking-tight">파일 변환기</h1>
           <span className="text-muted-foreground text-xs">
             기기 안에서만 변환합니다
