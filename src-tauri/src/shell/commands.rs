@@ -2,12 +2,14 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use serde::Serialize;
 use tauri::State;
 
 use crate::core::file_type::FileKind;
 use crate::core::job::{JobId, JobRequest, JobStatus};
+use crate::core::progress::{heartbeat_percent, Heartbeat, CONVERT_STARTED_PERCENT};
 use crate::core::runtime::assets::H2O_VERSION;
 use crate::core::runtime::plan::{ExtensionState, RuntimeStatus};
 use crate::shell::runtime_manager::InstallEvent;
@@ -72,8 +74,10 @@ pub struct RuntimeStatusView {
     pub managed: bool,
 }
 
+/// 상태 조회는 변환과 같은 프로필 잠금을 기다린다 — 대용량 변환 중에는 몇 분이 걸릴 수
+/// 있어 메인 스레드에서 돌리면 그동안 창이 통째로 얼어붙는다. 그래서 async 다.
 #[tauri::command]
-pub fn get_runtime_status(
+pub async fn get_runtime_status(
     state: State<'_, AppState>,
     refresh: bool,
 ) -> Result<RuntimeStatusView, String> {
@@ -81,7 +85,19 @@ pub fn get_runtime_status(
         return Ok(unsupported_view());
     };
 
-    let status = runtime.status(refresh)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let status = runtime.status(refresh)?;
+        status_view(&runtime, status)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// 상태 + 실행 파일 경로를 프론트가 쓰는 모양으로 묶는다.
+fn status_view(
+    runtime: &crate::shell::runtime_manager::RuntimeManager,
+    status: RuntimeStatus,
+) -> Result<RuntimeStatusView, String> {
     let exe = runtime.soffice()?;
 
     Ok(RuntimeStatusView {
@@ -113,15 +129,7 @@ pub async fn install_runtime(
             &|| false,
         );
 
-        outcome.map(|status| {
-            let exe = runtime.soffice().ok().flatten();
-            RuntimeStatusView {
-                state: runtime_state_label(&status).to_string(),
-                version: status.libreoffice.as_ref().map(|lo| lo.version.to_string()),
-                exe_path: exe.map(|info| info.exe.display().to_string()),
-                managed: status.libreoffice.map(|lo| lo.managed).unwrap_or(false),
-            }
-        })
+        outcome.and_then(|status| status_view(&runtime, status))
     })
     .await
     .map_err(|error| error.to_string())??;
@@ -162,7 +170,26 @@ pub fn convert_hwp(
             eprintln!("진행률 보고 실패: {error}");
         }
 
-        match runtime.convert_to_pdf(&input, std::path::Path::new(&out_path)) {
+        // 그 다음은 추정치로 막대를 살려 둔다. 100MB 문서는 몇 분씩 걸리는데
+        // 그동안 아무것도 안 보내면 사용자는 앱이 멈춘 줄 안다.
+        let heartbeat = {
+            let reporter = Arc::clone(&reporter);
+            let expected = runtime.expected_conversion_time(&input);
+
+            Heartbeat::start(HEARTBEAT_INTERVAL, move |elapsed| {
+                if let Err(error) =
+                    reporter.report_progress(id, heartbeat_percent(elapsed, expected))
+                {
+                    eprintln!("진행률 보고 실패: {error}");
+                }
+            })
+        };
+
+        let outcome = runtime.convert_to_pdf(&input, std::path::Path::new(&out_path));
+        // 완료·실패보다 먼저 멈춘다 — 늦게 도착한 추정치가 결과를 덮으면 안 된다.
+        heartbeat.stop();
+
+        match outcome {
             Ok(note) => {
                 // 안내는 완료보다 먼저 — 완료 이벤트를 보고 UI 가 항목을 접을 수 있다.
                 if let Some(note) = note {
@@ -185,8 +212,8 @@ pub fn convert_hwp(
     Ok(id)
 }
 
-/// 변환이 시작됐음을 알리는 최소 진행률 (soffice 는 중간 보고를 하지 않는다).
-const CONVERT_STARTED_PERCENT: u8 = 5;
+/// 추정 진행률을 보내는 간격. 짧을수록 부드럽지만 웹뷰 렌더가 늘어난다.
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(1);
 
 fn unsupported_view() -> RuntimeStatusView {
     RuntimeStatusView {

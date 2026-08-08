@@ -135,6 +135,29 @@ pub fn extension_strategy_for(managed: bool) -> ExtensionStrategy {
     }
 }
 
+/// 반대쪽 조회 스코프.
+///
+/// 확장을 **넣는 곳**과 LibreOffice 가 **등록해 두는 곳**은 다르다. 번들 디렉토리에 푼
+/// 확장도 기동할 때 전용 프로필(user)에 등록되므로, 한쪽만 보면 동작하는 확장을 놓친다.
+pub fn other_scope(strategy: ExtensionStrategy) -> ExtensionStrategy {
+    match strategy {
+        ExtensionStrategy::BundledDir => ExtensionStrategy::UserProfile,
+        ExtensionStrategy::UserProfile => ExtensionStrategy::BundledDir,
+    }
+}
+
+/// 두 스코프 조회 결과를 합친다 — 어느 쪽이든 등록돼 있으면 등록이다.
+///
+/// 조회 실패(`Unknown`)는 "없다"가 아니다. 읽어낸 쪽이 하나라도 있으면 그쪽을 믿는다.
+pub fn merge_extension_states(primary: ExtensionState, fallback: ExtensionState) -> ExtensionState {
+    match (primary, fallback) {
+        (registered @ ExtensionState::Registered { .. }, _) => registered,
+        (_, registered @ ExtensionState::Registered { .. }) => registered,
+        (ExtensionState::Unknown, other) => other,
+        (primary, _) => primary,
+    }
+}
+
 /// `unopkg list` 출력에서 우리 확장의 등록 상태만 뽑는다.
 ///
 /// 한 확장 블록에는 `is registered:` 가 여러 번 나온다 — 첫 줄이 확장 자체이고,
@@ -729,5 +752,58 @@ mod tests {
         let base = Path::new("/Users/kim/Library/Application Support/file-converter");
 
         assert!(managed_install_root(MAC, base).is_ok());
+    }
+
+    // ── 확장 조회 스코프 합치기 ────────────────────────────────────
+
+    #[test]
+    fn 어느_스코프든_등록돼_있으면_등록이다() {
+        // 번들 디렉토리에 푼 확장은 기동할 때 프로필(user)에 등록된다 —
+        // 한 스코프만 보면 실제로 동작하는 확장을 "없다"고 단정한다.
+        let registered = ExtensionState::Registered {
+            version: "0.7.13".to_string(),
+        };
+
+        assert_eq!(
+            merge_extension_states(ExtensionState::NotRegistered, registered.clone()),
+            registered
+        );
+        assert_eq!(
+            merge_extension_states(registered.clone(), ExtensionState::NotRegistered),
+            registered
+        );
+    }
+
+    #[test]
+    fn 둘_다_없다고_하면_미등록이다() {
+        assert_eq!(
+            merge_extension_states(ExtensionState::NotRegistered, ExtensionState::NotRegistered),
+            ExtensionState::NotRegistered
+        );
+    }
+
+    #[test]
+    fn 한쪽만_읽어냈으면_읽어낸_쪽을_믿는다() {
+        // 조회 실패(Unknown)를 "미등록"으로 덮으면 재설치를 무한히 권하게 된다.
+        assert_eq!(
+            merge_extension_states(ExtensionState::Unknown, ExtensionState::NotRegistered),
+            ExtensionState::NotRegistered
+        );
+        assert_eq!(
+            merge_extension_states(ExtensionState::Unknown, ExtensionState::Unknown),
+            ExtensionState::Unknown
+        );
+    }
+
+    #[test]
+    fn 다른_스코프는_서로를_가리킨다() {
+        assert_eq!(
+            other_scope(ExtensionStrategy::BundledDir),
+            ExtensionStrategy::UserProfile
+        );
+        assert_eq!(
+            other_scope(ExtensionStrategy::UserProfile),
+            ExtensionStrategy::BundledDir
+        );
     }
 }

@@ -13,6 +13,7 @@ use crate::core::fs_port::FileSystem;
 use crate::core::hwp::inspect::preflight_file;
 use crate::core::hwp::message::reject_message;
 use crate::core::hwp::preflight::Preflight;
+use crate::core::progress::expected_duration;
 use crate::core::runtime::assets::{
     asset_file_name, h2orestart_asset, jre_asset, libreoffice_asset, AssetSpec, Platform,
 };
@@ -21,9 +22,10 @@ use crate::core::runtime::installer::{
     bundled_extension_dir, jre_dir_name, resolve_java_home, InstallError, ToolInstaller,
 };
 use crate::core::runtime::plan::{
-    extension_strategy_for, is_stale_lock_error, managed_install_root, parse_unopkg_list,
-    profile_lock_file, resolve_install_plan, unopkg_add_args, unopkg_list_args, ExtensionState,
-    ExtensionStrategy, InstallStep, InstalledLibreOffice, RuntimeStatus,
+    extension_strategy_for, is_stale_lock_error, managed_install_root, merge_extension_states,
+    other_scope, parse_unopkg_list, profile_lock_file, resolve_install_plan, unopkg_add_args,
+    unopkg_list_args, ExtensionState, ExtensionStrategy, InstallStep, InstalledLibreOffice,
+    RuntimeStatus,
 };
 use crate::core::soffice::detect::{detect, unopkg_next_to, SofficeInfo};
 use crate::core::soffice::invoke::{timeout_for, ConvertPlan};
@@ -199,16 +201,38 @@ impl RuntimeManager {
         extension_strategy_for(self.is_managed(soffice))
     }
 
+    /// 확장 등록 여부. 넣은 스코프에서 못 찾으면 반대쪽도 본다.
+    ///
+    /// 번들 디렉토리에 푼 확장은 `unopkg list --bundled` 에 뜨지 않는다 — LibreOffice 가
+    /// 기동하면서 전용 프로필(user)에 등록하기 때문이다. 한쪽만 보면 변환이 멀쩡히 되는데도
+    /// "확장을 설치해야 합니다"를 영원히 띄운다 (실환경에서 실제로 그랬다).
     fn query_extension(&self, soffice: &Path) -> Result<ExtensionState, String> {
-        let profile = self.paths.profile_url()?;
         let unopkg = unopkg_next_to(soffice);
         if !self.fs.is_file(&unopkg) {
             return Ok(ExtensionState::Unknown);
         }
 
+        let strategy = self.extension_strategy(soffice);
+        let primary = self.query_extension_scope(&unopkg, strategy)?;
+        if matches!(primary, ExtensionState::Registered { .. }) {
+            return Ok(primary);
+        }
+
+        let fallback = self.query_extension_scope(&unopkg, other_scope(strategy))?;
+
+        Ok(merge_extension_states(primary, fallback))
+    }
+
+    fn query_extension_scope(
+        &self,
+        unopkg: &Path,
+        strategy: ExtensionStrategy,
+    ) -> Result<ExtensionState, String> {
+        let profile = self.paths.profile_url()?;
+
         let output = self.run_with_profile(crate::core::soffice::runner::ProcessRequest {
-            program: unopkg,
-            args: unopkg_list_args(&profile, self.extension_strategy(soffice)),
+            program: unopkg.to_path_buf(),
+            args: unopkg_list_args(&profile, strategy),
             env: self.child_env(),
             timeout: UNOPKG_TIMEOUT,
         });
@@ -453,6 +477,14 @@ impl RuntimeManager {
         }
     }
 
+    /// 이 입력이 얼마나 걸릴 것 같은가 — 진행 하트비트가 막대를 채우는 기준.
+    ///
+    /// 크기 비례 규칙은 제한 시간 하나만 알고 있다. 여기서 따로 계산하면 둘이 어긋나
+    /// 막대가 다 찬 뒤에도 한참 남거나, 반도 못 찬 채 타임아웃이 난다.
+    pub fn expected_conversion_time(&self, input: &Path) -> Duration {
+        expected_duration(timeout_for(self.fs.len(input).unwrap_or(0)))
+    }
+
     /// 한 건 변환. 프리플라이트 → soffice → 판정 → 산출물 이동 순서를 지킨다.
     ///
     /// 성공 시 돌려주는 값은 사용자에게 함께 보여줄 안내다 (배포용 문서 등).
@@ -675,6 +707,71 @@ mod tests {
         );
     }
 
+    /// 스코프(인자)에 따라 다른 목록을 돌려주는 매니저 — 실제 unopkg 처럼 군다.
+    fn scoped_manager(bundled_stdout: &'static str, user_stdout: &'static str) -> RuntimeManager {
+        let platform = Platform::host().expect("지원 플랫폼");
+        let base = std::env::temp_dir().join("fc-scope-test");
+        let paths = RuntimePaths::new(&base, platform).expect("런타임 경로");
+
+        let soffice = paths.libreoffice.join("soffice");
+        let unopkg = unopkg_next_to(&soffice);
+
+        let runner = Arc::new(
+            FakeRunner::new()
+                .responding(soffice.clone(), ok_output(VERSION_STDOUT))
+                .responding_with(unopkg.clone(), move |request: &ProcessRequest| {
+                    let bundled = request.args.iter().any(|arg| arg == "--bundled");
+                    ok_output(if bundled { bundled_stdout } else { user_stdout })
+                }),
+        );
+
+        RuntimeManager::new(
+            Arc::new(
+                FakeProbe::new()
+                    .user_override(soffice.clone())
+                    .executable(soffice),
+            ),
+            runner,
+            Arc::new(FakeFs::new().with_file(unopkg, b"bin".to_vec())),
+            Arc::new(FakeDownloader::new(Vec::new())),
+            Arc::new(UnusedInstaller),
+            paths,
+            platform,
+        )
+    }
+
+    const H2O_REGISTERED: &str = "All deployed user extensions:\n\n\
+         Identifier: ebandal.libreoffice.H2Orestart\n  \
+         Version: 0.7.13\n  \
+         is registered: yes\n";
+
+    #[test]
+    fn 번들_스코프에_없어도_사용자_스코프에_있으면_등록이다() {
+        // 실환경: 번들 디렉토리에 푼 H2Orestart 는 `list --bundled` 에 뜨지 않고
+        // 기동할 때 전용 프로필(user)에 등록된다. 번들만 보면 변환이 되는데도
+        // "확장을 설치해야 합니다"가 영원히 뜬다.
+        let manager = scoped_manager("All deployed bundled extensions:\n<none>\n", H2O_REGISTERED);
+
+        let status = manager.status(true).expect("상태 조회");
+
+        assert_eq!(
+            status.extension,
+            ExtensionState::Registered {
+                version: "0.7.13".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn 두_스코프_어디에도_없으면_미등록이다() {
+        let none = "All deployed bundled extensions:\n<none>\n";
+        let manager = scoped_manager(none, none);
+
+        let status = manager.status(true).expect("상태 조회");
+
+        assert_eq!(status.extension, ExtensionState::NotRegistered);
+    }
+
     #[test]
     fn 번들_확장이_등록돼_있으면_상태가_registered_다() {
         let listing = "All bundled extensions:\n\n\
@@ -813,8 +910,12 @@ mod tests {
         dir
     }
 
-    /// 변환이 성공하는 매니저 — soffice 가 `--outdir` 에 PDF 를 떨군 것처럼 굴린다.
     fn converting_manager() -> RuntimeManager {
+        converting_manager_with_fs().0
+    }
+
+    /// 변환이 성공하는 매니저 — soffice 가 `--outdir` 에 PDF 를 떨군 것처럼 굴린다.
+    fn converting_manager_with_fs() -> (RuntimeManager, Arc<FakeFs>) {
         let platform = Platform::host().expect("지원 플랫폼");
         let base = std::env::temp_dir().join("fc-convert-manager-test");
         let paths = RuntimePaths::new(&base, platform).expect("런타임 경로");
@@ -847,15 +948,17 @@ mod tests {
             .user_override(soffice.clone())
             .executable(soffice);
 
-        RuntimeManager::new(
+        let manager = RuntimeManager::new(
             Arc::new(probe),
             runner,
-            fs,
+            Arc::clone(&fs) as Arc<dyn FileSystem>,
             Arc::new(FakeDownloader::new(Vec::new())),
             Arc::new(UnusedInstaller),
             paths,
             platform,
-        )
+        );
+
+        (manager, fs)
     }
 
     #[test]
@@ -892,6 +995,33 @@ mod tests {
         // Assert — 경고를 남발하면 진짜 경고가 묻힌다.
         assert_eq!(note, None);
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // ── 하트비트 기준 시간 ────────────────────────────────────────
+
+    #[test]
+    fn 큰_입력일수록_예상_소요_시간이_길다() {
+        // Arrange — 하트비트가 크기를 무시하면 100MB 문서의 막대가 몇 초 만에 상한에 붙는다.
+        let (manager, fs) = converting_manager_with_fs();
+        let small = Path::new("/in/메모.hwp");
+        let large = Path::new("/in/백서.hwp");
+        fs.add_file(small, b"tiny".to_vec());
+        fs.add_file(large, vec![0u8; 12 * 1024 * 1024]);
+
+        // Act & Assert
+        assert!(manager.expected_conversion_time(large) > manager.expected_conversion_time(small));
+    }
+
+    #[test]
+    fn 크기를_모르는_입력에도_0_이_아닌_기준_시간을_준다() {
+        // 0 이면 하트비트가 첫 알림부터 상한으로 튀어 아무 정보도 주지 않는다.
+        let manager = converting_manager();
+
+        let expected = manager.expected_conversion_time(Path::new("/없는/파일.hwp"));
+
+        assert!(expected > Duration::ZERO);
+        // 제한 시간까지 다 쓰면 정상 변환에서도 막대가 절반에서 끝난다.
+        assert!(expected < timeout_for(0));
     }
 
     #[test]

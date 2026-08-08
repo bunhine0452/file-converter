@@ -70,8 +70,15 @@ impl<S: EventSink> JobReporter<S> {
     }
 
     /// 진행률을 갱신하고, 값이 실제로 바뀐 경우에만 이벤트를 발행한다.
+    ///
+    /// 취소·종료 단계의 작업에는 쓰지 않는다 — 하트비트의 마지막 알림이 완료 뒤에
+    /// 도착하면 UI 가 끝난 작업을 다시 "변환 중"으로 되돌린다.
     pub fn report_progress(&self, id: JobId, progress: u8) -> Result<(), ReportError> {
         let current = self.queue.get(id).ok_or(JobError::NotFound(id))?;
+        if !matches!(current.status, JobStatus::Queued | JobStatus::Running) {
+            return Ok(());
+        }
+
         let progress = progress.min(PROGRESS_MAX);
 
         // 같은 값을 반복 발행하면 웹뷰가 무의미한 렌더로 밀린다.
@@ -304,6 +311,44 @@ mod tests {
             Err(ReportError::Job(JobError::NotFound(999)))
         ));
         assert!(sink.events().is_empty());
+    }
+
+    #[test]
+    fn 취소_중인_작업에는_진행률을_쓰지_않는다() {
+        // Arrange — 취소를 눌렀지만 워커(하트비트)는 아직 돌고 있다.
+        let (reporter, sink) = reporter();
+        let id = reporter.enqueue(request()).expect("등록 성공");
+        reporter.claim_next().expect("워커가 작업을 집음");
+        reporter.cancel(id).expect("취소 요청");
+
+        // Act
+        reporter.report_progress(id, 70).expect("늦은 진행률 보고");
+
+        // Assert — 막대가 다시 오르면 사용자는 취소가 씹힌 줄 안다.
+        assert!(!sink
+            .events()
+            .iter()
+            .any(|event| matches!(event, JobEvent::Progress { progress: 70, .. })));
+        assert_eq!(reporter.snapshot()[0].status, JobStatus::Cancelling);
+    }
+
+    #[test]
+    fn 끝난_작업에_늦게_도착한_진행률은_무시된다() {
+        // 하트비트의 마지막 알림은 완료 처리 뒤에 도착할 수 있다.
+        let (reporter, sink) = reporter();
+        let id = reporter.enqueue(request()).expect("등록 성공");
+        reporter.claim_next().expect("워커가 작업을 집음");
+        reporter.complete(id).expect("완료 처리");
+
+        reporter.report_progress(id, 42).expect("늦은 진행률 보고");
+
+        let job = &reporter.snapshot()[0];
+        assert_eq!(job.status, JobStatus::Completed);
+        assert_eq!(job.progress, PROGRESS_MAX);
+        assert!(!sink
+            .events()
+            .iter()
+            .any(|event| matches!(event, JobEvent::Progress { progress: 42, .. })));
     }
 
     #[test]

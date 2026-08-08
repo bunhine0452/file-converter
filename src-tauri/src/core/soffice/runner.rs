@@ -126,10 +126,13 @@ pub mod fake {
 
     /// 실제 도구의 부작용을 흉내내는 훅. 요청을 받아야 `--outdir` 같은 인자를 볼 수 있다.
     type Effect = Box<dyn Fn(&ProcessRequest) + Send + Sync>;
+    /// 인자에 따라 다른 출력을 내는 응답기 (같은 프로그램을 스코프만 바꿔 부르는 경우).
+    type Responder = Box<dyn Fn(&ProcessRequest) -> ProcessOutput + Send + Sync>;
 
     #[derive(Default)]
     pub struct FakeRunner {
         responses: Mutex<BTreeMap<PathBuf, ProcessOutput>>,
+        responders: Mutex<BTreeMap<PathBuf, Responder>>,
         default_response: Mutex<Option<ProcessOutput>>,
         effects: Mutex<BTreeMap<PathBuf, Effect>>,
         calls: Mutex<Vec<ProcessRequest>>,
@@ -146,6 +149,19 @@ pub mod fake {
                 .lock()
                 .unwrap()
                 .insert(program.into(), output);
+            self
+        }
+
+        /// 인자를 보고 출력을 고른다 — 고정 응답보다 우선한다.
+        pub fn responding_with(
+            self,
+            program: impl Into<PathBuf>,
+            responder: impl Fn(&ProcessRequest) -> ProcessOutput + Send + Sync + 'static,
+        ) -> Self {
+            self.responders
+                .lock()
+                .unwrap()
+                .insert(program.into(), Box::new(responder));
             self
         }
 
@@ -185,6 +201,9 @@ pub mod fake {
                 effect(request);
             }
 
+            if let Some(responder) = self.responders.lock().unwrap().get(&request.program) {
+                return Ok(responder(request));
+            }
             if let Some(output) = self.responses.lock().unwrap().get(&request.program) {
                 return Ok(output.clone());
             }

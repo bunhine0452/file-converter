@@ -188,6 +188,42 @@ describe("useConversionQueue", () => {
     expect(result.current.items[0].note).toBe("안내");
   });
 
+  // ── 늦게 도착한 진행률 ────────────────────────────────────────
+
+  it("완료된 항목은 늦게 온 진행 이벤트로 되돌아가지 않는다", async () => {
+    // 하트비트의 마지막 추정치는 완료 뒤에 도착할 수 있다.
+    const { result } = await renderQueue();
+    act(() => result.current.track(1, "/tmp/a.hwp", "/out/a.pdf"));
+
+    await sendJobEvent({ kind: "completed", id: 1 });
+    await sendJobEvent({ kind: "progress", id: 1, progress: 40 });
+
+    expect(result.current.items[0].status).toBe("completed");
+    expect(result.current.items[0].progress).toBe(100);
+  });
+
+  it("취소 중인 항목은 진행 이벤트로 다시 변환 중이 되지 않는다", async () => {
+    // 취소를 눌렀는데 막대가 다시 오르면 취소가 씹힌 것처럼 보인다.
+    const { result } = await renderQueue();
+    act(() => result.current.track(1, "/tmp/a.hwp", "/out/a.pdf"));
+
+    await sendJobEvent({ kind: "cancelling", id: 1 });
+    await sendJobEvent({ kind: "progress", id: 1, progress: 60 });
+
+    expect(result.current.items[0].status).toBe("cancelling");
+  });
+
+  it("실패한 항목도 늦은 진행률에 되살아나지 않는다", async () => {
+    const { result } = await renderQueue();
+    act(() => result.current.track(1, "/tmp/a.hwp", "/out/a.pdf"));
+
+    await sendJobEvent({ kind: "failed", id: 1, message: "변환 실패" });
+    await sendJobEvent({ kind: "progress", id: 1, progress: 80 });
+
+    expect(result.current.items[0].status).toBe("failed");
+    expect(result.current.items[0].message).toBe("변환 실패");
+  });
+
   it("언마운트하면 이벤트를 더 받지 않는다", async () => {
     const { result, unmount } = await renderQueue();
     act(() => result.current.track(1, "/tmp/a.hwp", "/out/a.pdf"));

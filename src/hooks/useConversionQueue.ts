@@ -19,6 +19,14 @@ export interface ConversionItem {
 
 const PROGRESS_MAX = 100;
 
+/** 더 이상 진행률을 받지 않는 상태 — 늦게 온 추정치가 결과를 되돌리면 안 된다. */
+const SETTLED_STATUSES: readonly ConversionStatus[] = [
+  "cancelling",
+  "cancelled",
+  "completed",
+  "failed",
+];
+
 /** 경로 구분자는 OS 마다 다르다 — 둘 다 끊는다. */
 function fileNameOf(path: string): string {
   const segments = path.split(/[\\/]/);
@@ -29,6 +37,8 @@ function fileNameOf(path: string): string {
 function applyEvent(item: ConversionItem, event: JobEvent): ConversionItem {
   switch (event.kind) {
     case "progress":
+      // 변환 중 진행률은 추정치라 완료·실패·취소보다 늦게 도착할 수 있다.
+      if (SETTLED_STATUSES.includes(item.status)) return item;
       return { ...item, status: "running", progress: event.progress };
     case "completed":
       return { ...item, status: "completed", progress: PROGRESS_MAX };
