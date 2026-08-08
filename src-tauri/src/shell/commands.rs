@@ -278,7 +278,73 @@ fn runtime_state_label(status: &RuntimeStatus) -> &'static str {
         return "needsJre";
     }
     match &status.extension {
-        ExtensionState::Registered { version } if version == H2O_VERSION => "ready",
-        _ => "needsExtension",
+        ExtensionState::Registered { version } if version == H2O_VERSION => {}
+        _ => return "needsExtension",
+    }
+
+    // 글꼴이 없으면 변환은 되지만 한글이 깨진다 — 준비됐다고 말하면 거짓말이다.
+    if !status.korean_fonts {
+        return "needsFonts";
+    }
+
+    "ready"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::runtime::plan::InstalledLibreOffice;
+    use crate::core::soffice::version::LoVersion;
+
+    fn ready_status() -> RuntimeStatus {
+        RuntimeStatus {
+            libreoffice: Some(InstalledLibreOffice {
+                version: LoVersion {
+                    major: 26,
+                    minor: 2,
+                    micro: 5,
+                    patch: 2,
+                },
+                managed: true,
+            }),
+            java_home: Some(std::path::PathBuf::from("/jre")),
+            extension: ExtensionState::Registered {
+                version: H2O_VERSION.to_string(),
+            },
+            profile_poisoned: false,
+            korean_fonts: true,
+        }
+    }
+
+    // ── happy path ───────────────────────────────────────────────
+
+    #[test]
+    fn 전부_갖춰지면_ready_다() {
+        assert_eq!(runtime_state_label(&ready_status()), "ready");
+    }
+
+    // ── edge cases ───────────────────────────────────────────────
+
+    #[test]
+    fn 한글_글꼴이_없으면_설치가_필요하다고_말한다() {
+        // 글꼴이 없으면 변환은 되지만 결과가 깨진다 — 준비됐다고 하면 거짓말이다.
+        let status = RuntimeStatus {
+            korean_fonts: false,
+            ..ready_status()
+        };
+
+        assert_eq!(runtime_state_label(&status), "needsFonts");
+    }
+
+    #[test]
+    fn 더_앞선_결핍이_우선한다() {
+        // 글꼴만 콕 집어 말해 봐야 LibreOffice 조차 없으면 소용없다.
+        let status = RuntimeStatus {
+            libreoffice: None,
+            korean_fonts: false,
+            ..ready_status()
+        };
+
+        assert_eq!(runtime_state_label(&status), "needsLibreOffice");
     }
 }

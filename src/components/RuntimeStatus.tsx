@@ -11,7 +11,12 @@ import {
 import { cn } from "@/lib/utils";
 
 /** 설치를 권할 수 있는 상태 — `unsupported` 는 사용자가 할 수 있는 게 없다. */
-const INSTALLABLE = new Set(["needsLibreOffice", "needsJre", "needsExtension"]);
+const INSTALLABLE = new Set([
+  "needsLibreOffice",
+  "needsJre",
+  "needsExtension",
+  "needsFonts",
+]);
 
 interface Progress {
   step: string;

@@ -2,7 +2,12 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 
 /** 변환에 필요한 런타임이 어디까지 준비됐는가. */
 export type RuntimeState =
-  "ready" | "needsLibreOffice" | "needsJre" | "needsExtension" | "unsupported";
+  | "ready"
+  | "needsLibreOffice"
+  | "needsJre"
+  | "needsExtension"
+  | "needsFonts"
+  | "unsupported";
 
 export interface RuntimeStatusView {
   state: RuntimeState;
@@ -56,6 +61,7 @@ export const RUNTIME_STATE_MESSAGE: Record<RuntimeState, string> = {
   needsLibreOffice: "한글 문서 변환기를 아직 내려받지 않았습니다",
   needsJre: "Java 런타임이 필요합니다",
   needsExtension: "한글 문서 확장을 설치해야 합니다",
+  needsFonts: "한글 글꼴을 내려받아야 합니다 (없으면 글자가 깨집니다)",
   unsupported: "이 플랫폼에서는 변환을 지원하지 않습니다",
 };
 

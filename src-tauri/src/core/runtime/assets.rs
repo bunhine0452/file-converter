@@ -155,6 +155,28 @@ pub fn h2orestart_asset() -> AssetSpec {
     }
 }
 
+/// 한글 본문 글꼴 (SIL OFL 1.1). HWP 가 쓰는 한컴 계열 글꼴이 없는 기계에서
+/// 두부(□)·엉뚱한 대체 글꼴을 막으려면 완전한 한글 커버리지가 필요하다.
+/// 태그 URL 이라 내용이 바뀌지 않는다 (바뀌면 해시 검증에서 걸린다).
+pub fn korean_font_assets() -> [(&'static str, AssetSpec); 2] {
+    [
+        (
+            "NotoSansKR-Regular.otf",
+            AssetSpec {
+                url: "https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/Sans/SubsetOTF/KR/NotoSansKR-Regular.otf",
+                sha256: "69975a0ac8472717870aefeab0a4d52739308d90856b9955313b2ad5e0148d68",
+            },
+        ),
+        (
+            "NotoSerifKR-Regular.otf",
+            AssetSpec {
+                url: "https://raw.githubusercontent.com/notofonts/noto-cjk/Serif2.003/Serif/SubsetOTF/KR/NotoSerifKR-Regular.otf",
+                sha256: "5ea012e15cb7eacc1f680aee1703f3b164791b1443ea3e52b65080cca5d179cf",
+            },
+        ),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

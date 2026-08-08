@@ -41,6 +41,9 @@ pub struct RuntimeStatus {
     pub extension: ExtensionState,
     /// JRE 없이 초기화돼 Java 를 영영 못 찾는 프로필인가.
     pub profile_poisoned: bool,
+    /// 한글 글꼴이 갖춰졌는가. 없으면 변환은 되지만 글자가 깨진다.
+    /// 사용자가 직접 설치한 LibreOffice 는 우리가 관리하지 않으므로 항상 true.
+    pub korean_fonts: bool,
 }
 
 /// 확장을 어디에 설치할 것인가.
@@ -291,6 +294,7 @@ mod tests {
                 version: H2O_VERSION.to_string(),
             },
             profile_poisoned: false,
+            korean_fonts: true,
         }
     }
 
@@ -327,6 +331,7 @@ mod tests {
             java_home: None,
             extension: ExtensionState::NotRegistered,
             profile_poisoned: false,
+            korean_fonts: false,
         };
 
         // Act

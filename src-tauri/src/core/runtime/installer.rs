@@ -176,6 +176,23 @@ pub fn bundled_extension_dir(soffice: &Path, os: Os) -> Option<PathBuf> {
     Some(extensions.join(EXTENSION_DIR_NAME))
 }
 
+/// 앱이 설치한 LibreOffice 가 기동할 때 읽는 글꼴 디렉토리.
+///
+/// 사용자 시스템 글꼴 폴더는 절대 건드리지 않는다 — 우리가 설치한 LibreOffice 안에만 둔다.
+pub fn bundled_font_dir(soffice: &Path, os: Os) -> Option<PathBuf> {
+    let install_root = soffice.parent()?.parent()?;
+    if install_root.as_os_str().is_empty() || install_root == Path::new("/") {
+        return None;
+    }
+
+    let fonts = match os {
+        Os::MacOs => install_root.join("Resources").join("fonts"),
+        Os::Windows => install_root.join("share").join("fonts"),
+    };
+
+    Some(fonts.join("truetype"))
+}
+
 /// 압축을 푼 JRE 트리에서 `JAVA_HOME` 후보를 우선순위대로.
 /// 아카이브가 최상위 디렉토리 없이 풀리는 배포본에 대비해 루트 자체도 포함한다.
 pub fn java_home_candidates(extracted_root: &Path, os: Os) -> Vec<PathBuf> {
@@ -519,5 +536,37 @@ mod tests {
         assert_eq!(jre_dir_name(), format!("jdk-{JRE_VERSION}-jre"));
         assert!(jre_dir_name().starts_with("jdk-"));
         assert!(jre_dir_name().ends_with("-jre"));
+    }
+
+    // ── 글꼴 디렉토리 ─────────────────────────────────────────────
+
+    #[test]
+    fn 맥은_앱_번들_안의_글꼴_폴더를_쓴다() {
+        let dir = bundled_font_dir(
+            Path::new("/data/runtime/libreoffice/LibreOffice.app/Contents/MacOS/soffice"),
+            Os::MacOs,
+        );
+
+        assert_eq!(
+            dir,
+            Some(PathBuf::from(
+                "/data/runtime/libreoffice/LibreOffice.app/Contents/Resources/fonts/truetype"
+            ))
+        );
+    }
+
+    #[test]
+    fn 윈도는_설치_루트의_share_아래를_쓴다() {
+        // 호스트 구분자 규칙을 타므로 기존 테스트와 같은 방식으로 검사한다.
+        let dir =
+            bundled_font_dir(Path::new("/data/lo/program/soffice.com"), Os::Windows).expect("경로");
+
+        assert_eq!(normalize(&dir), "/data/lo/share/fonts/truetype");
+    }
+
+    #[test]
+    fn 루트에_붙은_경로는_거절한다() {
+        // 시스템 글꼴 폴더에 쓰는 사고를 막는다.
+        assert_eq!(bundled_font_dir(Path::new("/soffice"), Os::MacOs), None);
     }
 }

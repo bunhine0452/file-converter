@@ -9,17 +9,20 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
+use crate::core::fonts::{has_substitutions, merge_substitutions};
 use crate::core::fs_port::FileSystem;
 use crate::core::hwp::inspect::preflight_file;
 use crate::core::hwp::message::{inspect_error_message, reject_message};
 use crate::core::hwp::preflight::Preflight;
 use crate::core::progress::expected_duration;
 use crate::core::runtime::assets::{
-    asset_file_name, h2orestart_asset, jre_asset, libreoffice_asset, AssetSpec, Platform,
+    asset_file_name, h2orestart_asset, jre_asset, korean_font_assets, libreoffice_asset, AssetSpec,
+    Platform,
 };
 use crate::core::runtime::download::{DownloadProgress, Downloader, ProgressThrottle};
 use crate::core::runtime::installer::{
-    bundled_extension_dir, jre_dir_name, resolve_java_home, InstallError, ToolInstaller,
+    bundled_extension_dir, bundled_font_dir, jre_dir_name, resolve_java_home, InstallError,
+    ToolInstaller,
 };
 use crate::core::runtime::plan::{
     extension_strategy_for, is_stale_lock_error, managed_install_root, merge_extension_states,
@@ -37,6 +40,8 @@ use crate::core::soffice::profile::ProfileUrl;
 use crate::core::soffice::runner::{ProcessRunner, Termination};
 
 const UNOPKG_TIMEOUT: Duration = Duration::from_secs(300);
+/// 진행 표시에 쓰는 글꼴 단계 라벨.
+const FONT_STEP_LABEL: &str = "한글 글꼴 준비 중";
 const PDF_MAGIC_LEN: usize = 5;
 
 /// 앱이 관리하는 런타임의 디렉토리 배치.
@@ -177,6 +182,12 @@ impl RuntimeManager {
         // JRE 없이 초기화된 프로필은 이후 JAVA_HOME 을 줘도 계속 실패한다 — 지워야 산다.
         let profile_poisoned = java_home.is_none() && self.fs.is_dir(&self.paths.profile);
 
+        let korean_fonts = match &soffice {
+            Some(info) if managed => self.has_korean_fonts(&info.exe),
+            // 사용자가 설치한 LibreOffice 의 글꼴은 우리가 관리하지 않는다.
+            _ => true,
+        };
+
         Ok(RuntimeStatus {
             libreoffice: soffice.map(|info| InstalledLibreOffice {
                 version: info.version,
@@ -185,6 +196,7 @@ impl RuntimeManager {
             java_home,
             extension,
             profile_poisoned,
+            korean_fonts,
         })
     }
 
@@ -307,6 +319,9 @@ impl RuntimeManager {
                 step: label.to_string(),
             });
         }
+
+        // 글꼴은 계획(순수 함수)이 디스크를 볼 수 없으니 여기서 멱등하게 챙긴다.
+        self.ensure_korean_fonts(on_event, is_cancelled)?;
 
         on_event(InstallEvent::Finished);
         self.status(true)
@@ -477,6 +492,104 @@ impl RuntimeManager {
         }
     }
 
+    /// 설치한 한글 글꼴이 모두 자리에 있는가.
+    fn has_korean_fonts(&self, soffice: &Path) -> bool {
+        let Some(font_dir) = bundled_font_dir(soffice, self.platform.os) else {
+            return true;
+        };
+
+        korean_font_assets()
+            .iter()
+            .all(|(name, _)| self.fs.is_file(&font_dir.join(name)))
+    }
+
+    /// 한글 글꼴과 대체 규칙을 갖춘다 — 이미 있으면 아무것도 하지 않는다.
+    ///
+    /// 우리가 설치한 LibreOffice 에만 넣는다. 사용자가 직접 설치한 LibreOffice 의
+    /// 디렉토리를 건드릴 권리는 없고, 그쪽은 시스템 글꼴이 이미 있을 가능성이 높다.
+    fn ensure_korean_fonts(
+        &self,
+        on_event: &mut dyn FnMut(InstallEvent),
+        is_cancelled: &dyn Fn() -> bool,
+    ) -> Result<(), String> {
+        let Some(soffice) = self.soffice()? else {
+            return Ok(());
+        };
+        if !self.is_managed(&soffice.exe) {
+            return Ok(());
+        }
+        let Some(font_dir) = bundled_font_dir(&soffice.exe, self.platform.os) else {
+            return Ok(());
+        };
+
+        let missing: Vec<_> = korean_font_assets()
+            .into_iter()
+            .filter(|(name, _)| !self.fs.is_file(&font_dir.join(name)))
+            .collect();
+
+        if !missing.is_empty() {
+            let label = FONT_STEP_LABEL;
+            on_event(InstallEvent::Started {
+                step: label.to_string(),
+            });
+
+            self.fs
+                .create_dir_all(&font_dir)
+                .map_err(|error| error.to_string())?;
+
+            for (name, spec) in missing {
+                let dest = self.paths.downloads.join(name);
+                self.download(&spec, label, on_event, is_cancelled)?;
+                std::fs::copy(&dest, font_dir.join(name)).map_err(|error| error.to_string())?;
+            }
+
+            on_event(InstallEvent::StepDone {
+                step: label.to_string(),
+            });
+        }
+
+        self.apply_font_substitutions()
+    }
+
+    /// 한컴 계열 글꼴 이름을 우리가 설치한 글꼴로 잇는 규칙을 프로필에 적어 둔다.
+    ///
+    /// 프로필을 지우면 규칙도 사라지므로 변환 직전에도 한 번 확인한다.
+    fn apply_font_substitutions(&self) -> Result<(), String> {
+        let registry = self
+            .paths
+            .profile
+            .join("user")
+            .join("registrymodifications.xcu");
+        let Ok(current) = std::fs::read_to_string(&registry) else {
+            // 프로필이 아직 없다 — 기동 후에 다시 시도한다.
+            return Ok(());
+        };
+
+        let Some(merged) = merge_substitutions(&current) else {
+            return Ok(());
+        };
+
+        std::fs::write(&registry, merged).map_err(|error| error.to_string())
+    }
+
+    /// 프로필에 글꼴 규칙이 없으면 채운다 (프로필 초기화 후 첫 변환에서 걸린다).
+    fn heal_font_substitutions(&self) {
+        let registry = self
+            .paths
+            .profile
+            .join("user")
+            .join("registrymodifications.xcu");
+        let applied = std::fs::read_to_string(&registry)
+            .map(|current| has_substitutions(&current))
+            .unwrap_or(true);
+
+        if !applied {
+            if let Err(error) = self.apply_font_substitutions() {
+                eprintln!("글꼴 대체 규칙을 적용하지 못했습니다: {error}");
+            }
+        }
+    }
+
     /// 이 입력이 얼마나 걸릴 것 같은가 — 진행 하트비트가 막대를 채우는 기준.
     ///
     /// 크기 비례 규칙은 제한 시간 하나만 알고 있다. 여기서 따로 계산하면 둘이 어긋나
@@ -509,6 +622,9 @@ impl RuntimeManager {
         let soffice = self
             .soffice()?
             .ok_or_else(|| "LibreOffice 가 준비되지 않았습니다".to_string())?;
+        if self.is_managed(&soffice.exe) {
+            self.heal_font_substitutions();
+        }
         let profile = self.paths.profile_url()?;
         let out_dir = self.unique_work_dir();
         self.fs
