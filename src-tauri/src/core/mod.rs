@@ -5,6 +5,7 @@ pub mod file_type;
 pub mod fonts;
 pub mod fs_port;
 pub mod hwp;
+pub mod image;
 pub mod job;
 pub mod output;
 pub mod progress;
