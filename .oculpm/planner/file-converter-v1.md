@@ -52,8 +52,8 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
   - [x] 한글 최적화 서체 스택(Pretendard 등)과 고정폭 숫자(tabular figures) 설정이 적용된다 {#tokens-typography}
 - [~] 앱 셸 레이아웃 {#app-shell}
   - [x] 변환 카테고리(문서/이미지/PDF/미디어) 사이드바와 메인 큐 화면 레이아웃이 완성된다 {#shell-nav}
-  - [ ] 설정 화면(출력 폴더·이름 규칙·테마·LibreOffice 상태)이 동작한다 {#shell-settings}
-  - [ ] 네이티브 타이틀바/윈도 컨트롤이 mac/win 각각 자연스럽게 통합된다 {#shell-window}
+  - [x] 설정 화면(출력 폴더·이름 규칙·테마·LibreOffice 상태)이 동작한다 {#shell-settings}
+  - [~] 네이티브 타이틀바/윈도 컨트롤이 mac/win 각각 자연스럽게 통합된다 {#shell-window}
 - [~] 디자인 품질·접근성 게이트 {#design-quality}
   - [~] 키보드만으로 파일 선택→변환→결과 열기가 가능하다 {#a11y-keyboard}
   - [x] 라이트/다크 모두 WCAG AA 대비를 통과한다 {#a11y-contrast}
@@ -143,4 +143,6 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
 | 2026-08-08T21:08:06+09:00 | #a11y-contrast | claude-code | ☐→x | .oculpm/journal/20260808/Features_to_add/2106_feature_design-tokens-app-shell-queue-actions.md | 토큰을 CSS 에서 직접 읽어 라이트/다크 10쌍 AA 검사(최저 5.59:1) — 테스트로 고정 |
 | 2026-08-08T21:08:17+09:00 | #motion-polish | claude-code | ☐→x | .oculpm/journal/20260808/Features_to_add/2106_feature_design-tokens-app-shell-queue-actions.md | 전역 prefers-reduced-motion 차단 + motion-reduce 유틸 · 모션 토큰 정의 |
 | 2026-08-08T21:08:26+09:00 | #a11y-keyboard | claude-code | ☐→~ | .oculpm/journal/20260808/Features_to_add/2106_feature_design-tokens-app-shell-queue-actions.md | 파일 선택·취소·PDF 열기 모두 버튼으로 도달 가능. 실제 앱 창에서 탭 이동 확인 남음 |
+| 2026-08-08T21:58:46+09:00 | #shell-settings | claude-code | ☐→x | .oculpm/journal/20260808/Features_to_add/2158_feature_settings-screen-and-native-titlebar.md | 저장 위치·접미사+미리보기·충돌 규칙·테마·런타임 상태 · settings.json 영속, 읽기는 실패하지 않는다 |
+| 2026-08-08T21:58:55+09:00 | #shell-window | claude-code | ☐→~ | .oculpm/journal/20260808/Features_to_add/2158_feature_settings-screen-and-native-titlebar.md | mac Overlay 타이틀바+신호등 여백+드래그 영역 구현, win 은 시스템 타이틀바. 화면 캡처 권한이 없어 육안 확인 남음 |
 <!-- oculpm:plan-log end -->
