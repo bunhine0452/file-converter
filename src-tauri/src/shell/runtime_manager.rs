@@ -11,7 +11,7 @@ use serde::Serialize;
 
 use crate::core::fs_port::FileSystem;
 use crate::core::hwp::inspect::preflight_file;
-use crate::core::hwp::message::reject_message;
+use crate::core::hwp::message::{inspect_error_message, reject_message};
 use crate::core::hwp::preflight::Preflight;
 use crate::core::progress::expected_duration;
 use crate::core::runtime::assets::{
@@ -494,7 +494,13 @@ impl RuntimeManager {
         input: &Path,
         out_path: &Path,
     ) -> Result<Option<&'static str>, String> {
-        let note = match preflight_file(input).map_err(|e| e.to_string())? {
+        let preflight = preflight_file(input).map_err(|error| {
+            // 라이브러리 진단은 로그에만 남긴다 — 사용자에게는 할 수 있는 일을 알려준다.
+            eprintln!("프리플라이트 실패({}): {error}", input.display());
+            inspect_error_message(&error).to_string()
+        })?;
+
+        let note = match preflight {
             Preflight::Reject(reason) => return Err(reject_message(reason).to_string()),
             Preflight::ProceedWithNote(note) => Some(note),
             Preflight::Proceed => None,
@@ -994,6 +1000,27 @@ mod tests {
 
         // Assert — 경고를 남발하면 진짜 경고가 묻힌다.
         assert_eq!(note, None);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn 한글_문서가_아닌_파일은_내부_진단_없이_거절된다() {
+        // Arrange — 확장자만 .hwp 인 텍스트 파일. 사용자는 "Invalid CFB file (330 bytes
+        // is too small)" 을 보고 할 수 있는 일이 없다.
+        let dir = real_temp_dir("가짜");
+        let input = dir.join("가짜.hwp");
+        std::fs::write(&input, "이건 그냥 텍스트입니다").expect("파일 기록");
+        let manager = converting_manager();
+
+        // Act
+        let result = manager.convert_to_pdf(&input, Path::new("/out/가짜.pdf"));
+
+        // Assert
+        let message = result.expect_err("거절되어야 한다");
+        for 내부어 in ["CFB", "sector", "Invalid", "bytes"] {
+            assert!(!message.contains(내부어), "내부 진단이 샌다: {message}");
+        }
+        assert!(message.contains("한글 문서가 아니거나"), "{message}");
         std::fs::remove_dir_all(&dir).ok();
     }
 
