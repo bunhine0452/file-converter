@@ -145,4 +145,5 @@ Tauri 2 + React 19 크로스플랫폼(Win/mac) 로컬 파일 변환기. 첫 데�
 | 2026-08-08T21:08:26+09:00 | #a11y-keyboard | claude-code | ☐→~ | .oculpm/journal/20260808/Features_to_add/2106_feature_design-tokens-app-shell-queue-actions.md | 파일 선택·취소·PDF 열기 모두 버튼으로 도달 가능. 실제 앱 창에서 탭 이동 확인 남음 |
 | 2026-08-08T21:58:46+09:00 | #shell-settings | claude-code | ☐→x | .oculpm/journal/20260808/Features_to_add/2158_feature_settings-screen-and-native-titlebar.md | 저장 위치·접미사+미리보기·충돌 규칙·테마·런타임 상태 · settings.json 영속, 읽기는 실패하지 않는다 |
 | 2026-08-08T21:58:55+09:00 | #shell-window | claude-code | ☐→~ | .oculpm/journal/20260808/Features_to_add/2158_feature_settings-screen-and-native-titlebar.md | mac Overlay 타이틀바+신호등 여백+드래그 영역 구현, win 은 시스템 타이틀바. 화면 캡처 권한이 없어 육안 확인 남음 |
+| 2026-08-08T22:32:28+09:00 | #hwp-happy | claude-code | ~→~ | .oculpm/journal/20260808/Bugs/2232_bug_hwp-korean-font-substitution.md | 글꼴 대체 결함 수정으로 렌더 품질 확보(한컴 계열→Noto). 앱 창 드래그&드롭 손검증만 남음 |
 <!-- oculpm:plan-log end -->
